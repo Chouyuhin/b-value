@@ -1,4 +1,4 @@
-gmt begin region3_tibet png
+gmt begin region3_tibet svg
     # --- 1. 设置范围与投影 ---
     # 范围：72/100/32/44 (覆盖紫色框区域)
     # 投影：墨卡托投影 (-JM)，宽度15cm (因为是宽条带，设宽一点更好看)
