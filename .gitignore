@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated output figures (reproducible from notebooks)
+*.pdf
+*.tiff
+*.png
+*.svg
