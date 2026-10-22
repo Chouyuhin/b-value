@@ -1,56 +1,42 @@
-gmt begin bvalue_dist png
-    # --- 1. 全局设置 ---
-    gmt set MAP_TICK_LENGTH 0p
-    gmt set MAP_FRAME_TYPE plain
-    
-    # --- 2. 绘制底图框架 ---
-    # -JA: 兰伯特方位等面积投影，中心(111.3, 32.5)，宽度10cm
-    gmt basemap -R80.1/13/142.5/52+r -JA111.3/32.5/10c -Baf 
-    
-    # --- 3. 绘制地形 ---
-    # -t30: 30%透明度，让地形退后，突显地震点
-    gmt grdimage @earth_relief_15s -I+d -Cterra -t30
-    
-    # --- 4. 绘制海岸线和国界 ---
-    gmt coast -Dl -W0.5p,black -N1/0.7p,- -A1000 
- 
-    # --- 5. 绘制地震点 (核心修改部分) ---
-    # 修改点：
-    # 1. 去掉了 -F, (因为现在是空格分隔)
-    # 2. 去掉了 NR>1 (假设这种格式通常没有标题行，如果有标题行，awk的数值判断也能自动过滤掉非数字文本)
-    # 3. 逻辑：如果第11列(震级)大于0，则打印 第8列(经度) 和 第7列(纬度)
-    
-    awk '$11>0 {print $8, $7}' /Users/chouyuhin/_Harvard/b-value/b_value/catalogs/CENCcat-format.txt | \
-    gmt plot -Sc0.01c -Gred -t60 -W0p
+#!/usr/bin/env bash
+# Fig. 1(a): epicentres of the converted CENC catalog (1970 to August 2023), the three analysis
+# regions B-D, and the largest historical earthquakes in and near them.
+# Run from this folder in the gmtenv conda environment:  bash fig1_mainlandmap.sh  ->  Fig1a_map.pdf
+# Events are selected by date and magnitude, not by line number (the catalog file has changed).
+# The 2008-10-21 "ML 8.5" entry (34.758N, 81.498E) is a typing error in the CENC catalog: no global
+# agency lists an event there and no aftershocks follow; it is excluded.
+set -e
+CAT=../../../catalogs/CENCcat_Mw_final.txt
+TMP=$(mktemp -d)
 
-    awk 'NR==456523 || NR==46526 || NR==435990 || NR==296238 {print $8, $7}' \
-    /Users/chouyuhin/_Harvard/b-value/b_value/catalogs/CENCcat_Mw_final.txt | \
-    gmt plot -Sa0.4c -Gyellow -W0.5p,black
-    # awk 'NR==456523 || NR==46526  || NR==435990 || NR==296238 \
-    # {print $8, $7, "M"$11}' \
-    # /Users/chouyuhin/_Harvard/b-value/b_value/catalogs/CENCcat_Mw_final.txt | \
-    # gmt text -F+f8p,Helvetica-Bold,black -D0.3c/0 -Gwhite@40
-    # --- 6. (可选) 绘制中国国界高亮 ---
-    # gmt plot CN-border-L1.gmt -W0.5p,black
-    # --- 6. 绘制矩形框 (新增部分) ---
-    # 设定矩形范围 (例如：经度 102-106，纬度 30-34)
-    # -W1.5p,blue  : 蓝色实线边框
-    # -L           : 确保闭合
-    # 如果你想给框里加个半透明底色，可以加上 -Gwhite@80 (白色80%透明)
-    # 龙门山地区
-    # echo "102 30
-    # 106 30
-    # 106 34
-    # 102 34
-    # 102 30" | gmt plot -W1.5p,blue -L
-    # 华北平原地区
-    # echo "110 34
-    # 120 34
-    # 120 42
-    # 110 42
-    # 110 34" | gmt plot -W1p,white -L
-    # # 川滇
-    # echo "97 22 107 34" | gmt plot -Sr+s -W1p,white
-    # # --- 绘制青藏高原主体范围 ---
-    # echo "73 35 90 45" | gmt plot -Sr+s -W1p,white
-gmt end show
+# epicentres, without the false 2008-10-21 entry
+awk '!($1==2008 && $2==10 && $3==21 && $11>=8) && $11>0 {print $8, $7}' $CAT > $TMP/epi.txt
+# largest historical earthquakes (Tangshan 1976, Kunlun 2001, Wenchuan 2008)
+awk '($1==1976&&$2==7&&$3==28&&$11>=7.5) || ($1==2001&&$2==11&&$3==14&&$11>=7.5) ||
+     ($1==2008&&$2==5&&$3==12&&$11>=7.5) {printf "%s %s %s %04d-%02d-%02d\n", $8, $7, $11, $1, $2, $3}' $CAT > $TMP/stars.txt
+test $(wc -l < $TMP/stars.txt) -eq 3
+
+# epicentres as a raster layer: number of events per 0.05-degree cell, drawn where > 0
+gmt xyz2grd $TMP/epi.txt -R60/160/0/60 -I0.05 -An -G$TMP/epi.nc
+echo "0 125/0/0 1e9 125/0/0" > $TMP/epi.cpt
+
+gmt begin Fig1a_map pdf
+    gmt set MAP_TICK_LENGTH 0p MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 10p
+    gmt basemap -R80.1/13/142.5/52+r -JA111.3/32.5/16c -Baf
+    gmt grdimage @earth_relief_15s -I+d -Cterra -t30 -E300
+    gmt coast -Dl -W0.5p,black -N1/0.7p,- -A1000
+    gmt grdimage $TMP/epi.nc -C$TMP/epi.cpt -Q -E600 -t10
+
+    # analysis regions (lon/lat rectangles; drawn along parallels and meridians)
+    for box in "73 90 35 45" "97 107 22 34" "110 117 34 42"; do
+        set -- $box
+        printf "%s %s\n%s %s\n%s %s\n%s %s\n%s %s\n" $1 $3 $2 $3 $2 $4 $1 $4 $1 $3 | gmt plot -Ap -W1.2p,white
+    done
+    printf "81.5 40 B\n102 28 C\n113.5 38 D\n" | gmt text -F+f22p,Helvetica,white+jCM
+
+    # stars and labels (magnitude and date)
+    awk '{print $1, $2}' $TMP/stars.txt | gmt plot -Sa0.5c -Gyellow -W0.5p,black
+    awk '{printf "> %s %s 11p 2.1c l\nMw %s\n%s\n", $1, $2, $3, $4}' $TMP/stars.txt |
+        gmt text -M -F+f9p,Helvetica-Bold+jLM -D0.35c/0 -Gwhite@30 -C2p/2p
+gmt end
+rm -rf $TMP

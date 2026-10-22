@@ -1,0 +1,2 @@
+window,t_start,t_end,n_events,mc,n_m,b_classical,b_classical_std,b_positive,b_positive_std,p_classical,p_positive,post_window_star_threshold,marked_cutoff,n_marked,marked_events_bdf
+NCP_1970-2023,1970-01-02,2023-08-13,90171,1.9,1200,0.644,0.003,1.02,0.008,0.0,0.023,7.0,5.6,6,1  1976-04-06  M 5.9; 2  1981-11-09  M 5.6; 3  1983-11-07  M 5.8; 4  1989-10-19  M 5.6; 5  1991-03-26  M 5.6; 6  1998-01-10  M 6.0

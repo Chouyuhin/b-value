@@ -1,0 +1,2 @@
+window,t_start,t_end,n_m,mc_maxc,mc_used,mc_mbs,mc_ks,p_ks,mc_max_tested,t_mbs_s,t_ks_s,n_c_mbs,b_c_mbs,b_c_std_mbs,n_p_mbs,b_p_mbs,b_p_std_mbs,n_c_ks,b_c_ks,b_c_std_ks,n_p_ks,b_p_ks,b_p_std_ks
+LMS_2011-2016,2011-01-01,2016-12-31,500,1.7,1.9,2.8,,,3.5,0.0,7.3,2429,1.01,0.019,1059,1.123,0.032,,,,,,

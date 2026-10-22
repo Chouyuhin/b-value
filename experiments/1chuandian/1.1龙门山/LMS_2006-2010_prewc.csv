@@ -1,0 +1,17 @@
+n_pre,1959
+n_pre_above_mc,1090
+independent_windows,2.2
+min_mag_by_quarter,2006Q1:1.4 2006Q2:1.4 2006Q3:1.4 2006Q4:1.4 2007Q1:1.4 2007Q2:1.4 2007Q3:1.4 2007Q4:1.4 2008Q1:1.4 2008Q2:1.4
+min_mag_pre,1.4
+local_mc_windows,1.9 1.9 1.9
+events_per_month_min,43
+events_per_month_max,105
+first_point,2007-02-17
+last_point_pre,2008-05-12 09:04:08
+bc_pre_min,0.98
+bc_pre_max,1.09
+bp_pre_min,1.1
+bp_pre_max,1.3
+bc_last_pre,1.0
+bp_last_pre,1.18
+first_post,2008-05-12 14:28:04:0.97/1.11 2008-05-12 14:36:38.500000:0.96/1.11 2008-05-12 14:41:54.700000:0.94/1.11

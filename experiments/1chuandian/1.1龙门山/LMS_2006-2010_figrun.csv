@@ -1,0 +1,2 @@
+window,t_start,t_end,n_events,mc,n_m,b_classical,b_classical_std,b_positive,b_positive_std,p_classical,p_positive,post_window_star_threshold,marked_cutoff,n_marked,marked_events_bdf
+LMS_2006-2010,2006-01-01,2010-12-31,56287,1.9,500,0.761,0.005,0.987,0.009,0.0,0.0,6.0,5.8,9,1  2008-05-12  M 7.9; 2  2008-05-12  M 5.8; 3  2008-05-12  M 5.8; 4  2008-05-13  M 5.8; 5  2008-05-18  M 5.8; 6  2008-05-25  M 6.1; 7  2008-07-24  M 5.8; 8  2008-08-01  M 5.8; 9  2008-08-05  M 5.8

@@ -22,8 +22,7 @@ b_value/
 │   │   ├── 1.1Longmenshan/                Longmenshan fault zone
 │   │   ├── 1.2Xianshuihe/                Xianshuihe fault zone
 │   │   ├── 1.3Zuoxia/                  SW sub-region
-│   │   ├── 1.4Xiaojiang/                  Xiaojiang fault zone
-│   │   └── 1.5Zhongxia/                  Central sub-region
+│   │   └── 1.4Xiaojiang/                  Xiaojiang fault zone
 │   ├── 2huabei/                      North China Plain (90 k events)
 │   │   ├── region2_huabei.csv
 │   │   └── bvalue4huabei.ipynb

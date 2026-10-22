@@ -1,0 +1,2 @@
+window,t_start,t_end,n_events,mc,n_m,b_classical,b_classical_std,b_positive,b_positive_std,p_classical,p_positive,post_window_star_threshold,marked_cutoff,n_marked,marked_events_bdf
+WYN_2020-2023,2020-01-01,2023-08-13,28642,1.9,500,0.964,0.012,1.055,0.021,0.035,0.023,6.0,4.6,7,1  2021-05-13  M 4.6; 2  2021-05-21  M 5.4; 3  2021-05-21  M 4.6; 4  2021-05-21  M 6.2; 5  2021-05-21  M 4.9; 6  2021-05-21  M 5.1; 7  2021-05-22  M 4.6

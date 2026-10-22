@@ -1,0 +1,2 @@
+window,t_start,t_end,n_events,mc,n_m,b_classical,b_classical_std,b_positive,b_positive_std,p_classical,p_positive,post_window_star_threshold,marked_cutoff,n_marked,marked_events_bdf
+LMS_2011-2016,2011-01-01,2016-12-31,55362,1.9,500,0.881,0.006,1.005,0.011,0.002,0.013,6.0,5.2,5,1  2013-04-20  M 6.5; 2  2013-04-20  M 5.2; 3  2013-04-20  M 5.2; 4  2013-04-21  M 5.2; 5  2013-04-21  M 5.2

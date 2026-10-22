@@ -1,0 +1,2 @@
+window,t_start,t_end,n_events,mc,n_m,b_classical,b_classical_std,b_positive,b_positive_std,p_classical,p_positive,post_window_star_threshold,marked_cutoff,n_marked,marked_events_bdf
+XJ_1970-2023,1970-01-15,2023-08-12,30778,1.9,1500,0.785,0.005,1.151,0.014,0.002,0.032,7.0,5.4,6,1  2004-08-10  M 5.4; 2  2008-08-30  M 5.8; 3  2008-08-31  M 5.4; 4  2012-09-07  M 5.5; 5  2012-09-07  M 5.4; 6  2014-08-03  M 6.3

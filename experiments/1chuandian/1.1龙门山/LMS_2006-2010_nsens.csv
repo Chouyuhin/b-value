@@ -1,0 +1,4 @@
+window,mc,n_m,used,n_events_above_mc,p_classical,p_positive,n_subsamples
+LMS_2006-2010,1.9,300,False,23079,0.0,0.0,76.9
+LMS_2006-2010,1.9,500,True,23079,0.0,0.0,46.2
+LMS_2006-2010,1.9,1000,False,23079,0.0,0.021,23.1
