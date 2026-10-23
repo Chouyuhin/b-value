@@ -1,0 +1,33 @@
+no,site,lon,lat,T_C,zone
+1,Sangzao Spring,104.35,31.61,19.0,The LMSF zone
+2,Wenchuan Well,103.77,31.63,n.d.,The LMSF zone
+3,Lixian Well,103.59,31.48,32.9,The LMSF zone
+4,Guergou Spring,103.17,31.46,n.d.,The LMSF zone
+5,Jiuzhaigou Spring,103.00,31.52,30.5,The LMSF zone
+6,Erdaohai Spring,103.32,32.73,21.6,The MJF zone
+7,Kakagou Spring,103.68,32.98,18.7,The MJF zone
+8,Chuanpanqiao Spring,103.64,32.85,8.8,The MJF zone
+9,Songpan Well,103.60,32.65,9.0,The MJF zone
+10,Ganzi Well,100.00,31.62,27.8,The XSHF zone
+11,Ganzi Spring,100.00,31.61,43.1,The XSHF zone
+12,Guyi Spring,100.80,31.27,35.5,The XSHF zone
+13,Longpugou Spring 1,101.24,30.98,37.8,The XSHF zone
+14,Longpugou Spring 2,101.24,30.95,44.5,The XSHF zone
+15,Bamei Spring,101.62,30.54,55.2,The XSHF zone
+16,Guanding Spring,101.96,29.98,80.5,The XSHF zone
+17,Longtougou Spring,101.96,29.98,70.8,The XSHF zone
+18,Zheduotang Spring,101.86,30.01,54.5,The XSHF zone
+19,Erdaoqiao Spring,101.95,30.09,39.1,The XSHF zone
+20,Xinxing Spring,102.06,29.75,45.6,The XSHF zone
+21,Gonghe Spring,102.11,30.62,48.8,The XSHF zone
+22,Erhaoying Spring,102.03,29.59,65.5,The XSHF zone
+23,Tianwanhe Spring,102.14,29.49,53.0,The XSHF zone
+24,Caoke Spring,102.10,29.39,n.d.,The XSHF zone
+25,Shimian Well,102.22,29.44,n.d.,The XSHF zone
+26,Gongyihai Spring,102.39,29.02,56.9,The ANHF zone
+27,Chuanxin Spring,102.36,28.26,n.d.,The ANHF zone
+28,Taihe Spring,102.14,27.91,21.1,The ANHF zone
+29,Xichang Well,102.15,27.91,22.3,The ANHF zone
+30,Zhuhexiang Spring,102.93,28.07,49.8,The ANHF zone
+31,Lizhouzhen Spring,102.24,28.09,n.d.,The ANHF zone
+32,Luojishan Spring,102.54,27.40,n.d.,The ANHF zone
