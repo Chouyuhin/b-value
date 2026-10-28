@@ -30,17 +30,24 @@ Spatial claims (C1–C3), unit = grid node (0.05° spacing; N per node and 0.5°
   Rows need ≥ 20 nodes (XSH has no heat-flow site). Hot springs were dropped from the analysis (2026-10-23); the files stay in
   `data/hotsprings/` unused.
 
-Temporal claims (C4), unit = M ≥ 6 event since 2008 (main) or M ≥ 5 in the main-text windows (secondary):
-- series of the paper window containing the event (its N and Mc; shortest window where two overlap, `TILES`).
-- pre-event b = last window ending before the event; reference = mean of windows ending in the year before the pre-event window
-  starts; drop = (ref − b_pre)/ref ≥ 10 % (Gulia & Wiemer 2019 threshold; no std floor).
-- post-event b = first N events after a 7-day blind time (short-term aftershock incompleteness); rise = ≥ 10 % above b_pre.
-- alarms: windows ≥ 10 % below the running reference (same rule as for events, no std floor; decided 2026-10-23); contiguous
-  windows = one episode; duration 1 yr; false-alarm target = M ≥ 5 in the box (the event rows keep M ≥ 6).
-  False-alarm rate = episodes with no M ≥ 5 within 1 yr; alarm fraction = share of 2008–2023 covered by alarms. The row
-  "targets preceded by an alarm" was dropped.
-- events inside the Gardner–Knopoff time window of a larger earlier event AND within its G-K distance of that event or of its
-  first-week M ≥ 4 aftershocks are `in_sequence`; alarm episodes starting inside the G-K time window of an M ≥ 6 in the box are
-  `in_sequence` (the series is region-wide). Both are excluded from the clean counts.
+Temporal claims (C4), unit = the seven main-text windows (Figs 4–10), each with its own N and Mc (Table S1); the
+1970–2023 SI windows are not used (decided 2026-10-23):
+- reference of a window = mean of all earlier windows of the panel that share no event with it (pre-event expanding mean,
+  \u2265 5 windows; the Gulia & Wiemer 'years preceding' rule inside the panel; decided 2026-10-26). The Table S1 b is only drawn.
+- targets = the events marked in panel (d) (every event with M ≥ the fifth-largest magnitude); the initiator/aftershock
+  distinction was removed on 2026-10-26 (the `initiator` flag stays in events_C4.csv for information).
+- drop before = last window ending before the event ≥ 10 % below its reference (Gulia & Wiemer 2019 threshold).
+- rise after = first N events after a 7-day blind time, ≥ 10 % above the pre-event b.
+- alarm = window ≥ 10 % below the reference; contiguous windows = one episode; alarm duration 90 days; a drop (episode) is a
+  hit when an M ≥ 4 occurs in the window region within the following 7 days (30 and 90 d examined, 7 d chosen 2026-10-26); false-alarm rate = 100 % − hit rate; all
+  episodes are counted (the in-sequence flag stays in alarms_C4.csv); drops are identified on each estimator's own series, so
+  the two estimators have different drop counts (kept deliberately, 2026-10-27);
+  the 'random date' share (days of the window followed by an M ≥ 4 within 7 d) is printed as the chance reference; no pooled
+  total and no alarm-fraction column (removed 2026-10-27).
+
+Reference provenance: the per-window reference follows step 4 of Gulia et al. (2024, SRL 95:3579; PDF in
+`data/srl-2024163.1.pdf`): mean of the moving-window b-values over all events before the mainshock, here applied inside
+each panel with the paper's own N (not 150-event b-positive windows). Their full traffic-light procedure was tried on
+2026-10-26 and dropped (`ftls.py` kept unused; its result: 0 larger events followed any M>=6, 5 reds = false alarms).
 
 Node percentages are area fractions (neighbourhoods overlap); node counts are printed with every percentage.

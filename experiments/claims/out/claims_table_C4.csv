@@ -1,0 +1,49 @@
+col,label,window,fig,estimator,k,n,pct,alarm_fraction,hit_ref_share,n_episodes,n_marked
+drop,Marked events preceded by a b drop,LMS_2006-2010,Fig. 4,classical,7,9,77.77777777777777,0.10075287865367583,,1,9
+drop,Marked events preceded by a b drop,LMS_2011-2016,Fig. 5,classical,3,5,60.0,0.0815396804436815,,3,5
+drop,Marked events preceded by a b drop,XSH_2022-2023,Fig. 6,classical,1,5,20.0,0.18922155688622755,,6,6
+drop,Marked events preceded by a b drop,WYN_2020-2023,Fig. 7,classical,4,7,57.142857142857146,0.21867794004611837,,8,7
+drop,Marked events preceded by a b drop,XJ_2016-2023,Fig. 8,classical,3,6,50.0,0.2614966555183946,,52,6
+drop,Marked events preceded by a b drop,NCP_2008-2023,Fig. 9,classical,0,5,0.0,0.0028902862945748547,,12,5
+drop,Marked events preceded by a b drop,NW_2006-2023,Fig. 10,classical,2,6,33.333333333333336,0.1591563981042654,,11,6
+drop,Marked events preceded by a b drop,ALL,Total,classical,20,43,46.51162790697674,,,93,44
+rise,Marked events followed by a b rise,LMS_2006-2010,Fig. 4,classical,2,9,22.22222222222222,0.10075287865367583,,1,9
+rise,Marked events followed by a b rise,LMS_2011-2016,Fig. 5,classical,3,5,60.0,0.0815396804436815,,3,5
+rise,Marked events followed by a b rise,XSH_2022-2023,Fig. 6,classical,2,6,33.333333333333336,0.18922155688622755,,6,6
+rise,Marked events followed by a b rise,WYN_2020-2023,Fig. 7,classical,4,7,57.142857142857146,0.21867794004611837,,8,7
+rise,Marked events followed by a b rise,XJ_2016-2023,Fig. 8,classical,1,6,16.666666666666668,0.2614966555183946,,52,6
+rise,Marked events followed by a b rise,NCP_2008-2023,Fig. 9,classical,1,5,20.0,0.0028902862945748547,,12,5
+rise,Marked events followed by a b rise,NW_2006-2023,Fig. 10,classical,2,6,33.333333333333336,0.1591563981042654,,11,6
+rise,Marked events followed by a b rise,ALL,Total,classical,15,44,34.09090909090909,,,93,44
+hit,Drops followed by an M>=4 within 7 d,LMS_2006-2010,Fig. 4,classical,1,1,100.0,0.10075287865367583,0.35761226725082146,1,9
+hit,Drops followed by an M>=4 within 7 d,LMS_2011-2016,Fig. 5,classical,3,3,100.0,0.0815396804436815,0.24041970802919707,3,5
+hit,Drops followed by an M>=4 within 7 d,XSH_2022-2023,Fig. 6,classical,3,6,50.0,0.18922155688622755,0.1016949152542373,6,6
+hit,Drops followed by an M>=4 within 7 d,WYN_2020-2023,Fig. 7,classical,2,8,25.0,0.21867794004611837,0.08554125662376987,8,7
+hit,Drops followed by an M>=4 within 7 d,XJ_2016-2023,Fig. 8,classical,3,52,5.769230769230769,0.2614966555183946,0.02779783393501805,52,6
+hit,Drops followed by an M>=4 within 7 d,NCP_2008-2023,Fig. 9,classical,0,12,0.0,0.0028902862945748547,0.045406732117812064,12,5
+hit,Drops followed by an M>=4 within 7 d,NW_2006-2023,Fig. 10,classical,7,11,63.63636363636363,0.1591563981042654,0.7339135840845509,11,6
+hit,Drops followed by an M>=4 within 7 d,ALL,Total,classical,19,93,20.43010752688172,,,93,44
+drop,Marked events preceded by a b drop,LMS_2006-2010,Fig. 4,positive,5,9,55.55555555555556,0.07710363153232949,,12,9
+drop,Marked events preceded by a b drop,LMS_2011-2016,Fig. 5,positive,2,5,40.0,0.12207843655090453,,27,5
+drop,Marked events preceded by a b drop,XSH_2022-2023,Fig. 6,positive,0,5,0.0,0.057228400342172796,,32,6
+drop,Marked events preceded by a b drop,WYN_2020-2023,Fig. 7,positive,5,7,71.42857142857143,0.1911990776325903,,12,7
+drop,Marked events preceded by a b drop,XJ_2016-2023,Fig. 8,positive,4,6,66.66666666666667,0.33361204013377926,,60,6
+drop,Marked events preceded by a b drop,NCP_2008-2023,Fig. 9,positive,1,5,20.0,0.05186892161074874,,24,5
+drop,Marked events preceded by a b drop,NW_2006-2023,Fig. 10,positive,2,6,33.333333333333336,0.027497630331753554,,6,6
+drop,Marked events preceded by a b drop,ALL,Total,positive,19,43,44.18604651162791,,,173,44
+rise,Marked events followed by a b rise,LMS_2006-2010,Fig. 4,positive,3,9,33.333333333333336,0.07710363153232949,,12,9
+rise,Marked events followed by a b rise,LMS_2011-2016,Fig. 5,positive,0,5,0.0,0.12207843655090453,,27,5
+rise,Marked events followed by a b rise,XSH_2022-2023,Fig. 6,positive,1,6,16.666666666666668,0.057228400342172796,,32,6
+rise,Marked events followed by a b rise,WYN_2020-2023,Fig. 7,positive,6,7,85.71428571428571,0.1911990776325903,,12,7
+rise,Marked events followed by a b rise,XJ_2016-2023,Fig. 8,positive,2,6,33.333333333333336,0.33361204013377926,,60,6
+rise,Marked events followed by a b rise,NCP_2008-2023,Fig. 9,positive,2,5,40.0,0.05186892161074874,,24,5
+rise,Marked events followed by a b rise,NW_2006-2023,Fig. 10,positive,3,6,50.0,0.027497630331753554,,6,6
+rise,Marked events followed by a b rise,ALL,Total,positive,17,44,38.63636363636363,,,173,44
+hit,Drops followed by an M>=4 within 7 d,LMS_2006-2010,Fig. 4,positive,12,12,100.0,0.07710363153232949,0.35761226725082146,12,9
+hit,Drops followed by an M>=4 within 7 d,LMS_2011-2016,Fig. 5,positive,18,27,66.66666666666667,0.12207843655090453,0.24041970802919707,27,5
+hit,Drops followed by an M>=4 within 7 d,XSH_2022-2023,Fig. 6,positive,12,32,37.5,0.057228400342172796,0.1016949152542373,32,6
+hit,Drops followed by an M>=4 within 7 d,WYN_2020-2023,Fig. 7,positive,7,12,58.333333333333336,0.1911990776325903,0.08554125662376987,12,7
+hit,Drops followed by an M>=4 within 7 d,XJ_2016-2023,Fig. 8,positive,5,60,8.333333333333334,0.33361204013377926,0.02779783393501805,60,6
+hit,Drops followed by an M>=4 within 7 d,NCP_2008-2023,Fig. 9,positive,3,24,12.5,0.05186892161074874,0.045406732117812064,24,5
+hit,Drops followed by an M>=4 within 7 d,NW_2006-2023,Fig. 10,positive,6,6,100.0,0.027497630331753554,0.7339135840845509,6,6
+hit,Drops followed by an M>=4 within 7 d,ALL,Total,positive,63,173,36.41618497109827,,,173,44

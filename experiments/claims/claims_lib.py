@@ -314,24 +314,18 @@ def gardner_knopoff_km(m):
 
 
 # ================================================================== C4: temporal claims
-# Paper windows that tile 2008-2023 in each region, shortest window first where two overlap
-# (events are evaluated with the N and Mc of the window that contains them, Table S1).
-TILES = {
-    'LMS': [('LMS_2006-2010', '2008-01-01', '2011-01-01'), ('LMS_2011-2016', '2011-01-01', '2017-01-01'),
-            ('LMS_2016-2023', '2017-01-01', '2024-01-01')],
-    'XSH': [('XSH_2008-2023', '2008-01-01', '2022-01-01'), ('XSH_2022-2023', '2022-01-01', '2024-01-01')],
-    'WYN': [('WYN_2000-2023', '2008-01-01', '2020-01-01'), ('WYN_2020-2023', '2020-01-01', '2024-01-01')],
-    'XJ': [('XJ_1970-2023', '2008-01-01', '2016-01-01'), ('XJ_2016-2023', '2016-01-01', '2024-01-01')],
-    'NCP': [('NCP_2008-2023', '2008-01-01', '2024-01-01')],
-    'NW': [('NW_2006-2023', '2008-01-01', '2024-01-01')],
-}
-T_START, T_END = pd.Timestamp('2008-01-01'), pd.Timestamp('2023-08-14')   # catalogue ends 2023-08-13
-DROP = 0.10           # Gulia & Wiemer (2019) red threshold: b at least 10% below the reference
-RISE = 0.10           # green threshold: b at least 10% above the pre-event level
-REF_YEARS = 1.0       # reference = mean of windows ending in the year before the pre-event window starts
-ALARM_YEARS = 1.0     # alarm duration after an alarm episode starts
-ALARM_TARGET = 5.0    # target magnitude of the false-alarm row (M >= 6 remains the target of the event rows)
+# Units = the seven main-text windows (Figs 4-10), each with its own N and Mc (Table S1); reference = the window's
+# whole-period b; targets = the events marked in panel (d) (fifth-largest rule); alarm duration 90 days.
+FIG_OF = {'LMS_2006-2010': 'Fig. 4', 'LMS_2011-2016': 'Fig. 5', 'XSH_2022-2023': 'Fig. 6', 'WYN_2020-2023': 'Fig. 7',
+          'XJ_2016-2023': 'Fig. 8', 'NCP_2008-2023': 'Fig. 9', 'NW_2006-2023': 'Fig. 10'}
+MAIN_LABELS = list(FIG_OF)
+T_START, T_END = pd.Timestamp('2008-01-01'), pd.Timestamp('2023-08-14')   # catalogue ends 2023-08-13 (SI epicentre row)
+DROP = 0.10           # Gulia & Wiemer (2019): b at least 10% below the reference
+RISE = 0.10           # b at least 10% above the pre-event level
 POST_BLIND_DAYS = 7   # post-event window starts after this blind time (short-term aftershock incompleteness)
+ALARM_DAYS = 7        # a drop is a hit when an M >= ALARM_TARGET_MAG follows within this many days (decided 2026-10-26)
+MIN_REF = 5           # windows needed before a reference (expanding mean) exists
+ALARM_TARGET_MAG = 4.0  # an alarm episode is a hit when an M >= this occurs in the window's region within ALARM_DAYS
 EDGE_DEG = 0.25
 
 _SERIES_CACHE = {}
@@ -360,34 +354,6 @@ def window_catalogue(label, figrun):
     return window_catalogue(label, figrun)
 
 
-def add_reference(s, ref_years=REF_YEARS):
-    """Running reference per window: mean b of the windows ending within ref_years before this window starts
-    (they share no event with it). Adds columns ref, n_ref, rel (relative change)."""
-    t_last = s['t_last'].to_numpy()
-    t_first = s['t_first'].to_numpy()
-    b = s['b'].to_numpy()
-    span = np.timedelta64(int(ref_years * 365.25 * 86400), 's')
-    # windows are ordered, so the reference set is a contiguous index range [lo, hi)
-    lo = np.searchsorted(t_last, t_first - span, side='left')
-    hi = np.searchsorted(t_last, t_first, side='left')
-    csum = np.concatenate([[0.0], np.nancumsum(b)])
-    cnt = np.concatenate([[0], np.cumsum(~np.isnan(b))])
-    n_ref = cnt[hi] - cnt[lo]
-    ref = np.where(n_ref > 0, (csum[hi] - csum[lo]) / np.maximum(n_ref, 1), np.nan)
-    s = s.copy()
-    s['ref'], s['n_ref'] = ref, n_ref
-    s['rel'] = (s['b'] - s['ref']) / s['ref']
-    s['alarm'] = s['rel'] <= -DROP            # Gulia & Wiemer (2019) 10% rule, same as for events
-    return s
-
-
-def tile_of(region, t):
-    for label, a, z in TILES[region]:
-        if pd.Timestamp(a) <= t < pd.Timestamp(z):
-            return label
-    return None
-
-
 def flag_in_sequence(ev, cat, min_mag=5.0, cloud_days=7, cloud_mag=4.0):
     """True when ev lies inside the aftershock sequence of a larger earlier event: within that event's Gardner-Knopoff
     time window, and within its G-K distance of the mainshock or of any of its first-week M >= cloud_mag aftershocks
@@ -407,7 +373,7 @@ def flag_in_sequence(ev, cat, min_mag=5.0, cloud_days=7, cloud_mag=4.0):
 
 
 def targets(region, min_mag=6.0, t0=T_START, t1=T_END, cat=None):
-    """Target events of a region: M >= min_mag in [t0, t1)."""
+    """M >= min_mag events of a region in [t0, t1) with edge and in-sequence flags (used by the SI epicentre row)."""
     full = load_region(region) if cat is None else cat
     ev = full[(full['mag'] >= min_mag) & (full['time'] >= t0) & (full['time'] < t1)].copy()
     x0, x1, y0, y1 = BOXES[region]
@@ -418,117 +384,97 @@ def targets(region, min_mag=6.0, t0=T_START, t1=T_END, cat=None):
     return ev.reset_index(drop=True)
 
 
-def targets_main_windows(region, min_mag=5.0):
-    """Secondary target set: M >= min_mag inside the region's main-text windows (Figs 4-10)."""
-    full = load_region(region)
-    parts = []
-    for label, (a, z) in MAIN_WINDOW_SPAN.items():
-        if label.startswith(region + '_'):
-            parts.append(targets(region, min_mag, pd.Timestamp(a), min(pd.Timestamp(z), T_END), cat=full).assign(label=label))
-    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
-
-
-def classify_event(ev, region, estimator_cls, figrun, ref_years=REF_YEARS, label=None):
-    """Pre-event window, reference, post-event window and the C4a/C4b outcomes for one event."""
-    label = label or tile_of(region, ev['time'])
-    s, sample = series_for_window(label, estimator_cls, figrun)
-    s = add_reference(s, ref_years)
-    t_ev = np.datetime64(ev['time'], 'ns')
-    out = dict(region=region, time=ev['time'], mag=ev['mag'], lon=ev['lon'], lat=ev['lat'],
-               label=label, n_m=int(s['n_m'].iloc[0]), mc=float(s['mc'].iloc[0]),
-               near_edge=bool(ev.get('near_edge', False)), in_sequence=bool(ev.get('in_sequence', False)),
-               b_pre=np.nan, std_pre=np.nan, pre_days=np.nan, ref=np.nan, n_ref=0, drop_rel=np.nan, drop=None,
-               b_post=np.nan, std_post=np.nan, post_start_days=np.nan, post_days=np.nan, rise_rel=np.nan, rise=None)
-    pre = s[s['t_last'] < t_ev]
-    if len(pre):
-        p = pre.iloc[-1]
-        out.update(b_pre=p['b'], std_pre=p['std'], pre_days=(p['t_last'] - p['t_first']) / np.timedelta64(1, 'D'),
-                   ref=p['ref'], n_ref=int(p['n_ref']))
-        if np.isfinite(p['ref']) and np.isfinite(p['b']):
-            out['drop_rel'] = (p['ref'] - p['b']) / p['ref']
-            out['drop'] = bool(out['drop_rel'] >= DROP)        # Gulia & Wiemer (2019) 10% rule, no std floor (events)
-    # post window: first n_m events with M >= mc after a blind time of POST_BLIND_DAYS (fixed Mc)
-    post = s[s['t_first'] > t_ev + np.timedelta64(POST_BLIND_DAYS, 'D')]
-    if len(post):
-        q = post.iloc[0]
-        out.update(b_post=q['b'], std_post=q['std'],
-                   post_start_days=(q['t_first'] - t_ev) / np.timedelta64(1, 'D'),
-                   post_days=(q['t_last'] - q['t_first']) / np.timedelta64(1, 'D'))
-        if np.isfinite(q['b']) and np.isfinite(out['b_pre']):
-            out['rise_rel'] = (q['b'] - out['b_pre']) / out['b_pre']
-            out['rise'] = bool(out['rise_rel'] >= RISE)        # 10% rule, no std floor (events)
-    return out
-
-
-def event_table(region, estimator_cls, figrun, min_mag=6.0, ref_years=REF_YEARS, ev=None):
-    ev = targets(region, min_mag) if ev is None else ev
-    rows = [classify_event(r, region, estimator_cls, figrun, ref_years, label=r.get('label'))
-            for _, r in ev.iterrows()]
-    t = pd.DataFrame(rows)
-    t['estimator'] = 'classical' if estimator_cls is ClassicBValueEstimator else 'positive'
-    return t
-
-
-def alarm_table(region, estimator_cls, figrun, ref_years=REF_YEARS, alarm_years=ALARM_YEARS,
-                target_mag=ALARM_TARGET, t0=T_START, t1=T_END):
-    """Alarm episodes 2008-2023 of a region (windows with b <= (1-DROP)*reference, contiguous windows merged),
-    with hit/false-alarm outcome, plus miss rate and alarm fraction. Returns (episodes, summary)."""
-    tg = targets(region, target_mag, t0, t1)
-    tg_t = tg['time'].to_numpy(dtype='datetime64[ns]')
-    pieces = []
-    for label, a, z in TILES[region]:
-        s, _ = series_for_window(label, estimator_cls, figrun)
-        s = add_reference(s, ref_years)
-        s = s[(s['t_last'] >= np.datetime64(a)) & (s['t_last'] < np.datetime64(z))]
-        s = s[s['t_last'] >= np.datetime64(t0)]
-        pieces.append(s.assign(label=label))
-    s = pd.concat(pieces, ignore_index=True)
-    alarm = s['alarm'].to_numpy(bool) & np.isfinite(s['rel'].to_numpy())
-    # episodes: runs of consecutive alarm windows
-    edges = np.flatnonzero(np.diff(np.concatenate([[0], alarm.astype(int), [0]])))
-    starts, ends = edges[::2], edges[1::2] - 1
-    dur = np.timedelta64(int(alarm_years * 365.25 * 86400), 's')
-    ep = []
-    for i0, i1 in zip(starts, ends):
-        t_start = s['t_last'].iloc[i0].to_datetime64()
-        t_stop = s['t_last'].iloc[i1].to_datetime64()
-        hits = tg_t[(tg_t > t_start) & (tg_t <= t_start + dur)]
-        in_seq = bool(np.any((tg_t < t_start) & (t_start <= tg_t + gardner_knopoff_days(tg['mag'].to_numpy()).astype('timedelta64[D]'))))
-        ep.append(dict(region=region, label=s['label'].iloc[i0], t_start=t_start, t_last_alarm=t_stop,
-                       n_windows=i1 - i0 + 1, min_rel=float(s['rel'].iloc[i0:i1 + 1].min()),
-                       hit=len(hits) > 0, first_target=hits[0] if len(hits) else pd.NaT,
-                       in_sequence=in_seq))
-    ep = pd.DataFrame(ep)
-    # misses: targets with no episode starting within alarm_years before them
-    missed = []
-    for t in tg_t:
-        ok = len(ep) and np.any((ep['t_start'].to_numpy() < t) & (ep['t_start'].to_numpy() >= t - dur))
-        missed.append(not ok)
-    # alarm fraction of the time span
-    span = (min(np.datetime64(t1), s['t_last'].max().to_datetime64()) - np.datetime64(t0)) / np.timedelta64(1, 'D')
-    covered = 0.0
-    if len(ep):
-        iv = sorted([(a, min(a + dur, np.datetime64(t1))) for a in ep['t_start'].to_numpy()])
-        cur_a, cur_b = iv[0]
-        for a, b in iv[1:]:
-            if a <= cur_b:
-                cur_b = max(cur_b, b)
-            else:
-                covered += (cur_b - cur_a) / np.timedelta64(1, 'D'); cur_a, cur_b = a, b
-        covered += (cur_b - cur_a) / np.timedelta64(1, 'D')
+def window_c4(label, estimator_cls, figrun, alarm_days=ALARM_DAYS):
+    """C4 for one main-text window: marked events (drop before / rise after), alarm episodes (false alarms) and
+    the alarm fraction, relative to the pre-event expanding-mean reference. Returns (events, episodes, summary)."""
+    region = figrun.loc[label, 'region']
     est = 'classical' if estimator_cls is ClassicBValueEstimator else 'positive'
-    per_tile = {lab: dict(n_windows=int((s['label'] == lab).sum()),
-                          frac_alarm_windows=float(alarm[(s['label'] == lab).to_numpy()].mean()) if (s['label'] == lab).any() else np.nan,
-                          n_episodes=int((ep['label'] == lab).sum()) if len(ep) else 0,
-                          median_std_rel=float((s.loc[s['label'] == lab, 'std'] / s.loc[s['label'] == lab, 'b']).median()))
-                for lab, _, _ in TILES[region]}
-    summ = dict(region=region, estimator=est, per_tile=per_tile, n_windows=len(s), n_alarm_windows=int(alarm.sum()),
-                n_episodes=len(ep), n_false=int((~ep['hit']).sum()) if len(ep) else 0,
-                n_episodes_clean=int((~ep['in_sequence']).sum()) if len(ep) else 0,
-                n_false_clean=int(((~ep['hit']) & (~ep['in_sequence'])).sum()) if len(ep) else 0,
-                n_targets=len(tg), n_missed=int(np.sum(missed)), alarm_fraction=covered / span)
-    ep['estimator'] = est
-    return ep, summ
+    b_ww = float(figrun.loc[label, 'b_classical' if est == 'classical' else 'b_positive'])   # Table S1 value (figure line)
+    s, _ = series_for_window(label, estimator_cls, figrun)
+    df = window_catalogue(label, figrun)
+    full = load_region(region)
+    s = s.copy()
+    # reference of each window = mean of all earlier windows of the panel that share no event with it (pre-event
+    # expanding mean: the Gulia & Wiemer 'years preceding' rule applied inside the panel); needs >= MIN_REF windows
+    t_l = s['t_last'].to_numpy(dtype='datetime64[ns]'); t_f = s['t_first'].to_numpy(dtype='datetime64[ns]')
+    bb = s['b'].to_numpy(); hi = np.searchsorted(t_l, t_f, side='left')
+    csum = np.concatenate([[0.0], np.nancumsum(bb)]); cnt = np.concatenate([[0], np.cumsum(np.isfinite(bb))])
+    s['n_ref'] = cnt[hi]
+    s['ref'] = np.where(cnt[hi] >= MIN_REF, csum[hi] / np.maximum(cnt[hi], 1), np.nan)
+    s['rel'] = (s['b'] - s['ref']) / s['ref']
+    s['alarm'] = s['rel'] <= -DROP
+    t_last = s['t_last'].to_numpy(dtype='datetime64[ns]'); t_first = s['t_first'].to_numpy(dtype='datetime64[ns]')
+    b = s['b'].to_numpy(); ref = s['ref'].to_numpy()
+    # ---- marked events of panel (d): every event with M >= the fifth-largest magnitude
+    numbers, _, top = marked_events(df['mag'].to_numpy(), df['time'].to_numpy(), 6.0)
+    ev_rows = []
+    for i in top:
+        r = df.iloc[i]
+        t_ev = np.datetime64(r['time'], 'ns')
+        rec = dict(window=label, fig=FIG_OF[label], region=region, estimator=est, number=numbers[int(i)],
+                   time=r['time'], mag=r['mag'], lon=r['lon'], lat=r['lat'],
+                   initiator=not flag_in_sequence(r, full), b_ww=b_ww, ref=np.nan,
+                   b_pre=np.nan, pre_days=np.nan, drop_rel=np.nan, drop=None,
+                   b_post=np.nan, post_start_days=np.nan, post_days=np.nan, rise_rel=np.nan, rise=None)
+        k = np.searchsorted(t_last, t_ev, side='left') - 1          # last window ending before the event
+        if k >= 0 and np.isfinite(b[k]):
+            rec.update(b_pre=b[k], pre_days=(t_last[k] - t_first[k]) / np.timedelta64(1, 'D'), ref=ref[k])
+            if np.isfinite(ref[k]):
+                rec.update(drop_rel=(ref[k] - b[k]) / ref[k], drop=bool((ref[k] - b[k]) / ref[k] >= DROP))
+        if True:
+            j = np.searchsorted(t_first, t_ev + np.timedelta64(POST_BLIND_DAYS, 'D'), side='right')
+            if j < len(s) and np.isfinite(b[j]) and np.isfinite(rec['b_pre']):
+                rec.update(b_post=b[j], post_start_days=(t_first[j] - t_ev) / np.timedelta64(1, 'D'),
+                           post_days=(t_last[j] - t_first[j]) / np.timedelta64(1, 'D'),
+                           rise_rel=(b[j] - rec['b_pre']) / rec['b_pre'],
+                           rise=bool((b[j] - rec['b_pre']) / rec['b_pre'] >= RISE))
+        ev_rows.append(rec)
+    events = pd.DataFrame(ev_rows)
+    mk_t = events['time'].to_numpy(dtype='datetime64[ns]') if len(events) else np.array([], dtype='datetime64[ns]')
+    mk_m = events['mag'].to_numpy(float) if len(events) else np.array([])
+    tg_t = df.loc[df['mag'] >= ALARM_TARGET_MAG, 'time'].to_numpy(dtype='datetime64[ns]')   # alarm targets: M >= 4 in the window
+    # ---- alarm episodes: runs of consecutive alarm windows
+    alarm = s['alarm'].to_numpy(bool) & np.isfinite(b)
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], alarm.astype(int), [0]])))
+    dur = np.timedelta64(alarm_days, 'D')
+    ep_rows = []
+    for i0, i1 in zip(edges[::2], edges[1::2] - 1):
+        start, stop = t_last[i0], t_last[i1]
+        hits = tg_t[(tg_t > start) & (tg_t <= start + dur)]
+        in_seq = bool(np.any((mk_t < start) & (start <= mk_t + gardner_knopoff_days(mk_m).astype('timedelta64[D]'))))
+        ep_rows.append(dict(window=label, fig=FIG_OF[label], region=region, estimator=est, t_start=start, t_last_alarm=stop,
+                            n_windows=int(i1 - i0 + 1), min_rel=float(s['rel'].iloc[i0:i1 + 1].min()),
+                            hit=len(hits) > 0, first_target=hits[0] if len(hits) else pd.NaT, in_sequence=in_seq))
+    episodes = pd.DataFrame(ep_rows)
+    # ---- alarm fraction of the window span
+    t0 = np.datetime64(pd.Timestamp(window_span(label)[0]), 'ns'); t1 = t_last[-1]
+    span = (t1 - t0) / np.timedelta64(1, 'D'); covered = 0.0
+    if len(episodes):
+        iv = sorted((a, min(a + dur, t1)) for a in episodes['t_start'].to_numpy())
+        ca, cb = iv[0]
+        for a, z in iv[1:]:
+            if a <= cb:
+                cb = max(cb, z)
+            else:
+                covered += (cb - ca) / np.timedelta64(1, 'D'); ca, cb = a, z
+        covered += (cb - ca) / np.timedelta64(1, 'D')
+    clean = episodes[~episodes['in_sequence']] if len(episodes) else episodes
+    days = np.arange(t0, t1, np.timedelta64(1, 'D'))
+    ref_share = float(np.mean([np.any((tg_t > d) & (tg_t <= d + dur)) for d in days])) if len(days) else np.nan
+    summary = dict(window=label, fig=FIG_OF[label], region=region, estimator=est, n_m=int(s['n_m'].iloc[0]),
+                   mc=float(s['mc'].iloc[0]), b_ww=b_ww, n_windows=len(s), n_alarm_windows=int(alarm.sum()),
+                   n_marked=len(events),
+                   drop_k=int(events['drop'].dropna().astype(bool).sum()) if len(events) else 0,
+                   drop_n=int(events['drop'].notna().sum()) if len(events) else 0,
+                   rise_k=int(events['rise'].dropna().astype(bool).sum()) if len(events) else 0,
+                   rise_n=int(events['rise'].notna().sum()) if len(events) else 0,
+                   n_episodes=len(episodes), n_episodes_clean=len(clean),
+                   n_false_clean=int((~clean['hit']).sum()) if len(clean) else 0,
+                   n_false_all=int((~episodes['hit']).sum()) if len(episodes) else 0,
+                   n_hits=int(episodes['hit'].sum()) if len(episodes) else 0, hit_ref_share=ref_share,
+                   alarm_fraction=float(alarm.mean()) if len(alarm) else np.nan,   # share of sliding windows under alarm
+                   alarm_time_fraction=covered / span)
+    return events, episodes, summary
 
 
 # ================================================================ spatial claims (C1-C3)

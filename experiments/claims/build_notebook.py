@@ -64,15 +64,15 @@ for cls in (ClassicBValueEstimator, BPositiveBValueEstimator):
 """)
 md("""
 Sanity figure for the C4 rule on a constant-b synthetic catalogue (b = 1, Mc 1.9, magnitudes binned to 0.1, Poisson times,
-N = 500): the share of windows flagged as alarms by the rule (≥10% below the preceding-year mean and ≥2 std).
+N = 500): the share of windows ≥10% below the whole-period b (the alarm rule).
 """)
 code("""
 rng = np.random.default_rng(0)
 n = 60000; mags = bin_to_precision(1.9 + rng.exponential(1 / np.log(10), n), 0.1)
 times = (pd.Timestamp('2008-01-01') + pd.to_timedelta(np.sort(rng.uniform(0, 15 * 365.25, n)), unit='D')).to_numpy()
 for cls in (ClassicBValueEstimator, BPositiveBValueEstimator):
-    s = add_reference(b_series(mags, times, 1.9, 500, cls))
-    print(f'{cls.__name__}: alarm windows {100 * s.alarm.mean():.1f}%  (≥10% drop alone: {100 * (s.rel <= -0.10).mean():.1f}%)')
+    s = b_series(mags, times, 1.9, 500, cls); b_ref = b_window(mags, times, 1.9, cls).b_value
+    print(f'{cls.__name__}: windows ≥10% below the whole-period b: {100 * ((s.b - b_ref) / b_ref <= -0.10).mean():.1f}%')
 """)
 
 md("""
@@ -107,31 +107,27 @@ thr = pd.DataFrame(thr).T; thr.to_csv(OUT / 'thresholds_2008-2023.csv'); thr
 """)
 
 md("""
-## 3. C4: events, pre/post windows, alarm episodes (events_C4.csv, alarms_C4.csv)
+## 3. C4 on the main-text windows (Figs 4–10): marked events, alarm episodes (events_C4.csv, alarms_C4.csv)
 
-Rules: pre-event window = last window ending before the event; reference = mean of the windows ending in the year before the
-pre-event window starts; drop = ≥10% below the reference; post window = first N events after a 7-day
-blind time; rise = ≥10% above the pre-event b. Alarm = window ≥10% below the running reference (same rule); contiguous windows form one
-episode; alarm duration 1 yr; false-alarm target M≥5 in the box (event rows: M≥6). Events and episodes inside the Gardner–Knopoff time window of a larger
-earlier event are flagged `in_sequence` and excluded from the clean counts.
+Unit = each main-text window with its own N and Mc; reference of a window = mean of all earlier windows of the panel that
+share no event with it (pre-event expanding mean, \u2265 5 windows). Targets = the events
+marked in panel (d) (fifth-largest rule).
+Drop = last window before the event ≥10% below its reference; rise = first N events after a 7-day blind
+time ≥10% above the pre-event b. Alarm = window ≥10% below the reference; contiguous windows = one episode; a drop is a hit
+when an M≥4 occurs in the window region within the following 7 days; false-alarm rate = 100% − hit rate (all episodes counted;
+the in-sequence flag is kept in alarms_C4.csv).
 """)
 code("""
 EV, EP, SM = [], [], []
-for region in REGIONS:
+for label in MAIN_LABELS:
     for cls in (ClassicBValueEstimator, BPositiveBValueEstimator):
-        et = event_table(region, cls, figrun, min_mag=6.0); et['set'] = 'M6_2008'
-        ev5 = targets_main_windows(region, 5.0)
-        et5 = event_table(region, cls, figrun, ev=ev5) if len(ev5) else pd.DataFrame()
-        if len(et5): et5['set'] = 'M5_main'
-        ep, summ = alarm_table(region, cls, figrun, target_mag=ALARM_TARGET); summ.pop('per_tile')
-        EV += [et, et5]; EP.append(ep); SM.append(summ)
-events = pd.concat(EV, ignore_index=True); alarms = pd.concat(EP, ignore_index=True); alarm_summary = pd.DataFrame(SM)
-events.to_csv(OUT / 'events_C4.csv', index=False); alarms.to_csv(OUT / 'alarms_C4.csv', index=False); alarm_summary.to_csv(OUT / 'alarms_C4_summary.csv', index=False)
-cols = ['region', 'estimator', 'time', 'mag', 'label', 'n_m', 'mc', 'in_sequence', 'b_pre', 'std_pre', 'pre_days', 'ref', 'drop_rel', 'drop', 'b_post', 'std_post', 'post_start_days', 'post_days', 'rise_rel', 'rise']
-events[events['set'] == 'M6_2008'][cols].round(3)
+        ev, ep, sm = window_c4(label, cls, figrun); EV.append(ev); EP.append(ep); SM.append(sm)
+events = pd.concat(EV, ignore_index=True); alarms = pd.concat(EP, ignore_index=True); c4_summary = pd.DataFrame(SM)
+events.to_csv(OUT / 'events_C4.csv', index=False); alarms.to_csv(OUT / 'alarms_C4.csv', index=False); c4_summary.to_csv(OUT / 'alarms_C4_summary.csv', index=False)
+c4_summary[['fig', 'window', 'estimator', 'n_m', 'b_ww', 'n_marked', 'drop_k', 'drop_n', 'rise_k', 'rise_n', 'n_episodes', 'n_hits', 'hit_ref_share']].round(3)
 """)
 code("""
-alarm_summary
+events[['fig', 'estimator', 'number', 'time', 'mag', 'initiator', 'ref', 'b_pre', 'pre_days', 'drop_rel', 'drop', 'b_post', 'post_start_days', 'post_days', 'rise_rel', 'rise']].round(3)
 """)
 
 md("""
@@ -163,11 +159,12 @@ md("""
 ## 5. Table and figures
 """)
 code("""
-tab = build_table(thr, gcmt, events, alarm_summary); tab.to_csv(OUT / 'claims_table.csv', index=False)
-mdtxt = table_markdown(tab); open(OUT / 'claims_table.md', 'w').write(mdtxt); display(Markdown(mdtxt))
+tab = build_table(thr, gcmt); tab.to_csv(OUT / 'claims_table.csv', index=False)
+c4 = build_c4_table(SM); c4.to_csv(OUT / 'claims_table_C4.csv', index=False)
+mdtxt = table_markdown(tab, c4); open(OUT / 'claims_table.md', 'w').write(mdtxt); display(Markdown(mdtxt))
 """)
 code("""
-fig_summary(tab, OUT / 'fig_summary.pdf')
+fig_summary(tab, c4, OUT / 'fig_summary.pdf')
 figS_C12(thr, gcmt, OUT / 'figS_C12.pdf')
 figS_C3(thr, hf, OUT / 'figS_C3.pdf')
 figS_C4(events, figrun, OUT / 'figS_C4.pdf')

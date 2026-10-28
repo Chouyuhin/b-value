@@ -1,121 +1,85 @@
-row,label,claim,region,estimator,k,n,pct,base,alarm_fraction
-C1_rate,Low-b nodes with high strain rate,C1,LMS,classical,385.0,1371,28.081692195477753,50.0,
-C2_rate,High-b nodes with low strain rate,C2,LMS,classical,1020.0,2640,38.63636363636363,50.0,
-C1_regime,Contractional nodes that are low-b,C1,LMS,classical,254.0,1337,18.99775617053104,34.18100224382947,
-C2_regime,Extensional nodes that are high-b,C2,LMS,classical,742.0,1337,55.49738219895288,65.81899775617053,
-C1_mech,Thrust mechanisms in low-b nodes,C1,LMS,classical,15.0,21,71.42857142857143,34.18100224382947,
-C2_mech,Normal mechanisms in high-b nodes,C2,LMS,classical,,1,,65.81899775617053,
-C3_hf,High-heat-flow nodes that are high-b,C3,LMS,classical,256.0,703,36.41536273115221,65.81899775617053,
-C4a,M>=6 preceded by a b drop,C4,LMS,classical,1.0,3,33.333333333333336,,
-C4b,M>=6 followed by a b rise,C4,LMS,classical,1.0,3,33.333333333333336,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,LMS,classical,52.0,62,83.87096774193549,,0.6504920780508129
-C1_rate,Low-b nodes with high strain rate,C1,LMS,positive,641.0,1455,44.054982817869416,50.0,
-C2_rate,High-b nodes with low strain rate,C2,LMS,positive,1192.0,2556,46.635367762128325,50.0,
-C1_regime,Contractional nodes that are low-b,C1,LMS,positive,479.0,1337,35.82647718773373,36.2752430815258,
-C2_regime,Extensional nodes that are high-b,C2,LMS,positive,921.0,1337,68.88556469708303,63.7247569184742,
-C1_mech,Thrust mechanisms in low-b nodes,C1,LMS,positive,15.0,21,71.42857142857143,36.2752430815258,
-C2_mech,Normal mechanisms in high-b nodes,C2,LMS,positive,,1,,63.7247569184742,
-C3_hf,High-heat-flow nodes that are high-b,C3,LMS,positive,375.0,703,53.34281650071124,63.7247569184742,
-C4a,M>=6 preceded by a b drop,C4,LMS,positive,1.0,3,33.333333333333336,,
-C4b,M>=6 followed by a b rise,C4,LMS,positive,0.0,3,0.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,LMS,positive,46.0,85,54.11764705882353,,0.9130777752723985
-C1_rate,Low-b nodes with high strain rate,C1,XSH,classical,225.0,394,57.10659898477157,50.0,
-C2_rate,High-b nodes with low strain rate,C2,XSH,classical,383.0,709,54.0197461212976,50.0,
-C1_regime,Contractional nodes that are low-b,C1,XSH,classical,94.0,368,25.543478260869566,35.720761559383504,
-C2_regime,Extensional nodes that are high-b,C2,XSH,classical,245.0,368,66.57608695652173,64.27923844061651,
-C1_mech,Thrust mechanisms in low-b nodes,C1,XSH,classical,,0,,35.720761559383504,
-C2_mech,Normal mechanisms in high-b nodes,C2,XSH,classical,,3,,64.27923844061651,
-C3_hf,High-heat-flow nodes that are high-b,C3,XSH,classical,,0,,64.27923844061651,
-C4a,M>=6 preceded by a b drop,C4,XSH,classical,0.0,2,0.0,,
-C4b,M>=6 followed by a b rise,C4,XSH,classical,1.0,2,50.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,XSH,classical,,0,,,0.060037062270749245
-C1_rate,Low-b nodes with high strain rate,C1,XSH,positive,250.0,455,54.94505494505494,50.0,
-C2_rate,High-b nodes with low strain rate,C2,XSH,positive,347.0,648,53.54938271604938,50.0,
-C1_regime,Contractional nodes that are low-b,C1,XSH,positive,120.0,368,32.608695652173914,41.25113327289211,
-C2_regime,Extensional nodes that are high-b,C2,XSH,positive,223.0,368,60.59782608695652,58.74886672710788,
-C1_mech,Thrust mechanisms in low-b nodes,C1,XSH,positive,,0,,41.25113327289211,
-C2_mech,Normal mechanisms in high-b nodes,C2,XSH,positive,,3,,58.74886672710788,
-C3_hf,High-heat-flow nodes that are high-b,C3,XSH,positive,,0,,58.74886672710788,
-C4a,M>=6 preceded by a b drop,C4,XSH,positive,0.0,2,0.0,,
-C4b,M>=6 followed by a b rise,C4,XSH,positive,0.0,2,0.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,XSH,positive,,0,,,0.05999830675302135
-C1_rate,Low-b nodes with high strain rate,C1,WYN,classical,856.0,1681,50.92207019631172,50.0,
-C2_rate,High-b nodes with low strain rate,C2,WYN,classical,1550.0,3068,50.521512385919166,50.0,
-C1_regime,Contractional nodes that are low-b,C1,WYN,classical,483.0,1583,30.51168667087808,35.3969256685618,
-C2_regime,Extensional nodes that are high-b,C2,WYN,classical,986.0,1583,62.28679722046747,64.6030743314382,
-C1_mech,Thrust mechanisms in low-b nodes,C1,WYN,classical,,1,,35.3969256685618,
-C2_mech,Normal mechanisms in high-b nodes,C2,WYN,classical,9.0,13,69.23076923076923,64.6030743314382,
-C3_hf,High-heat-flow nodes that are high-b,C3,WYN,classical,455.0,599,75.95993322203672,64.6030743314382,
-C4a,M>=6 preceded by a b drop,C4,WYN,classical,2.0,2,100.0,,
-C4b,M>=6 followed by a b rise,C4,WYN,classical,1.0,2,50.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,WYN,classical,0.0,3,0.0,,0.3326576788889306
-C1_rate,Low-b nodes with high strain rate,C1,WYN,positive,1110.0,2138,51.9176800748363,50.0,
-C2_rate,High-b nodes with low strain rate,C2,WYN,positive,1347.0,2611,51.589429337418615,50.0,
-C1_regime,Contractional nodes that are low-b,C1,WYN,positive,602.0,1583,38.02905874921036,45.02000421141293,
-C2_regime,Extensional nodes that are high-b,C2,WYN,positive,785.0,1583,49.589387239418826,54.97999578858707,
-C1_mech,Thrust mechanisms in low-b nodes,C1,WYN,positive,,1,,45.02000421141293,
-C2_mech,Normal mechanisms in high-b nodes,C2,WYN,positive,8.0,13,61.53846153846154,54.97999578858707,
-C3_hf,High-heat-flow nodes that are high-b,C3,WYN,positive,372.0,599,62.10350584307179,54.97999578858707,
-C4a,M>=6 preceded by a b drop,C4,WYN,positive,2.0,2,100.0,,
-C4b,M>=6 followed by a b rise,C4,WYN,positive,1.0,2,50.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,WYN,positive,6.0,25,24.0,,0.43590507329720796
-C1_rate,Low-b nodes with high strain rate,C1,XJ,classical,356.0,715,49.79020979020979,50.0,
-C2_rate,High-b nodes with low strain rate,C2,XJ,classical,509.0,1021,49.853085210577866,50.0,
-C1_regime,Contractional nodes that are low-b,C1,XJ,classical,216.0,579,37.30569948186528,41.18663594470046,
-C2_regime,Extensional nodes that are high-b,C2,XJ,classical,332.0,579,57.340241796200345,58.813364055299544,
-C1_mech,Thrust mechanisms in low-b nodes,C1,XJ,classical,,0,,41.18663594470046,
-C2_mech,Normal mechanisms in high-b nodes,C2,XJ,classical,,0,,58.813364055299544,
-C3_hf,High-heat-flow nodes that are high-b,C3,XJ,classical,112.0,124,90.3225806451613,58.813364055299544,
-C4a,M>=6 preceded by a b drop,C4,XJ,classical,0.0,1,0.0,,
-C4b,M>=6 followed by a b rise,C4,XJ,classical,1.0,1,100.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,XJ,classical,30.0,31,96.7741935483871,,0.28789211679551735
-C1_rate,Low-b nodes with high strain rate,C1,XJ,positive,260.0,610,42.622950819672134,50.0,
-C2_rate,High-b nodes with low strain rate,C2,XJ,positive,518.0,1126,46.00355239786856,50.0,
-C1_regime,Contractional nodes that are low-b,C1,XJ,positive,184.0,579,31.778929188255614,35.13824884792627,
-C2_regime,Extensional nodes that are high-b,C2,XJ,positive,339.0,579,58.54922279792746,64.86175115207374,
-C1_mech,Thrust mechanisms in low-b nodes,C1,XJ,positive,,0,,35.13824884792627,
-C2_mech,Normal mechanisms in high-b nodes,C2,XJ,positive,,0,,64.86175115207374,
-C3_hf,High-heat-flow nodes that are high-b,C3,XJ,positive,112.0,124,90.3225806451613,64.86175115207374,
-C4a,M>=6 preceded by a b drop,C4,XJ,positive,0.0,1,0.0,,
-C4b,M>=6 followed by a b rise,C4,XJ,positive,0.0,1,0.0,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,XJ,positive,50.0,56,89.28571428571429,,0.5181212062477559
-C1_rate,Low-b nodes with high strain rate,C1,NCP,classical,1324.0,2496,53.044871794871796,50.0,
-C2_rate,High-b nodes with low strain rate,C2,NCP,classical,2994.0,5836,51.30226182316655,50.0,
-C1_regime,Contractional nodes that are low-b,C1,NCP,classical,550.0,2778,19.798416126709864,29.956793086893903,
-C2_regime,Extensional nodes that are high-b,C2,NCP,classical,1650.0,2778,59.39524838012959,70.04320691310609,
-C1_mech,Thrust mechanisms in low-b nodes,C1,NCP,classical,,1,,29.956793086893903,
-C2_mech,Normal mechanisms in high-b nodes,C2,NCP,classical,,1,,70.04320691310609,
-C3_hf,High-heat-flow nodes that are high-b,C3,NCP,classical,1130.0,1688,66.94312796208531,70.04320691310609,
-C4a,M>=6 preceded by a b drop,C4,NCP,classical,,0,,,
-C4b,M>=6 followed by a b rise,C4,NCP,classical,,0,,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,NCP,classical,27.0,27,100.0,,0.1817300767763252
-C1_rate,Low-b nodes with high strain rate,C1,NCP,positive,952.0,2080,45.76923076923077,50.0,
-C2_rate,High-b nodes with low strain rate,C2,NCP,positive,3038.0,6252,48.59245041586692,50.0,
-C1_regime,Contractional nodes that are low-b,C1,NCP,positive,494.0,2778,17.782577393808495,24.963994239078254,
-C2_regime,Extensional nodes that are high-b,C2,NCP,positive,1920.0,2778,69.11447084233261,75.03600576092174,
-C1_mech,Thrust mechanisms in low-b nodes,C1,NCP,positive,,1,,24.963994239078254,
-C2_mech,Normal mechanisms in high-b nodes,C2,NCP,positive,,1,,75.03600576092174,
-C3_hf,High-heat-flow nodes that are high-b,C3,NCP,positive,1398.0,1688,82.81990521327015,75.03600576092174,
-C4a,M>=6 preceded by a b drop,C4,NCP,positive,,0,,,
-C4b,M>=6 followed by a b rise,C4,NCP,positive,,0,,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,NCP,positive,81.0,81,100.0,,0.5365405565695073
-C1_rate,Low-b nodes with high strain rate,C1,NW,classical,3458.0,5540,62.418772563176894,50.0,
-C2_rate,High-b nodes with low strain rate,C2,NW,classical,7168.0,12959,55.31290994675515,50.0,
-C1_regime,Contractional nodes that are low-b,C1,NW,classical,1895.0,6166,30.733052221861822,32.997066241185856,
-C2_regime,Extensional nodes that are high-b,C2,NW,classical,3096.0,6167,50.202691746392084,67.00293375881414,
-C1_mech,Thrust mechanisms in low-b nodes,C1,NW,classical,28.0,85,32.94117647058823,32.997066241185856,
-C2_mech,Normal mechanisms in high-b nodes,C2,NW,classical,4.0,14,28.571428571428573,67.00293375881414,
-C3_hf,High-heat-flow nodes that are high-b,C3,NW,classical,494.0,1169,42.25834046193328,67.00293375881414,
-C4a,M>=6 preceded by a b drop,C4,NW,classical,2.0,13,15.384615384615385,,
-C4b,M>=6 followed by a b rise,C4,NW,classical,2.0,13,15.384615384615385,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,NW,classical,,0,,,0.3519773691221146
-C1_rate,Low-b nodes with high strain rate,C1,NW,positive,2747.0,3675,74.74829931972789,50.0,
-C2_rate,High-b nodes with low strain rate,C2,NW,positive,8322.0,14824,56.13869400971398,50.0,
-C1_regime,Contractional nodes that are low-b,C1,NW,positive,1540.0,6166,24.975673045734673,20.670132276493902,
-C2_regime,Extensional nodes that are high-b,C2,NW,positive,4732.0,6167,76.73098751418843,79.3298677235061,
-C1_mech,Thrust mechanisms in low-b nodes,C1,NW,positive,31.0,85,36.470588235294116,20.670132276493902,
-C2_mech,Normal mechanisms in high-b nodes,C2,NW,positive,12.0,14,85.71428571428571,79.3298677235061,
-C3_hf,High-heat-flow nodes that are high-b,C3,NW,positive,907.0,1169,77.58768177929855,79.3298677235061,
-C4a,M>=6 preceded by a b drop,C4,NW,positive,2.0,13,15.384615384615385,,
-C4b,M>=6 followed by a b rise,C4,NW,positive,3.0,13,23.076923076923077,,
-C4_alarm,False-alarm rate: b-drop alarms with no M>=5 within 1 yr,C4,NW,positive,,0,,,0.18138525468660843
+row,label,claim,region,estimator,k,n,pct,base
+C1_rate,Low-b nodes with high strain rate,C1,LMS,classical,385.0,1371,28.081692195477753,50.0
+C2_rate,High-b nodes with low strain rate,C2,LMS,classical,1020.0,2640,38.63636363636363,50.0
+C1_regime,Contractional nodes that are low-b,C1,LMS,classical,254.0,1337,18.99775617053104,34.18100224382947
+C2_regime,Extensional nodes that are high-b,C2,LMS,classical,742.0,1337,55.49738219895288,65.81899775617053
+C1_mech,Thrust mechanisms in low-b nodes,C1,LMS,classical,15.0,21,71.42857142857143,34.18100224382947
+C2_mech,Normal mechanisms in high-b nodes,C2,LMS,classical,,1,,65.81899775617053
+C3_hf,High-heat-flow nodes that are high-b,C3,LMS,classical,256.0,703,36.41536273115221,65.81899775617053
+C1_rate,Low-b nodes with high strain rate,C1,LMS,positive,641.0,1455,44.054982817869416,50.0
+C2_rate,High-b nodes with low strain rate,C2,LMS,positive,1192.0,2556,46.635367762128325,50.0
+C1_regime,Contractional nodes that are low-b,C1,LMS,positive,479.0,1337,35.82647718773373,36.2752430815258
+C2_regime,Extensional nodes that are high-b,C2,LMS,positive,921.0,1337,68.88556469708303,63.7247569184742
+C1_mech,Thrust mechanisms in low-b nodes,C1,LMS,positive,15.0,21,71.42857142857143,36.2752430815258
+C2_mech,Normal mechanisms in high-b nodes,C2,LMS,positive,,1,,63.7247569184742
+C3_hf,High-heat-flow nodes that are high-b,C3,LMS,positive,375.0,703,53.34281650071124,63.7247569184742
+C1_rate,Low-b nodes with high strain rate,C1,XSH,classical,225.0,394,57.10659898477157,50.0
+C2_rate,High-b nodes with low strain rate,C2,XSH,classical,383.0,709,54.0197461212976,50.0
+C1_regime,Contractional nodes that are low-b,C1,XSH,classical,94.0,368,25.543478260869566,35.720761559383504
+C2_regime,Extensional nodes that are high-b,C2,XSH,classical,245.0,368,66.57608695652173,64.27923844061651
+C1_mech,Thrust mechanisms in low-b nodes,C1,XSH,classical,,0,,35.720761559383504
+C2_mech,Normal mechanisms in high-b nodes,C2,XSH,classical,,3,,64.27923844061651
+C3_hf,High-heat-flow nodes that are high-b,C3,XSH,classical,,0,,64.27923844061651
+C1_rate,Low-b nodes with high strain rate,C1,XSH,positive,250.0,455,54.94505494505494,50.0
+C2_rate,High-b nodes with low strain rate,C2,XSH,positive,347.0,648,53.54938271604938,50.0
+C1_regime,Contractional nodes that are low-b,C1,XSH,positive,120.0,368,32.608695652173914,41.25113327289211
+C2_regime,Extensional nodes that are high-b,C2,XSH,positive,223.0,368,60.59782608695652,58.74886672710788
+C1_mech,Thrust mechanisms in low-b nodes,C1,XSH,positive,,0,,41.25113327289211
+C2_mech,Normal mechanisms in high-b nodes,C2,XSH,positive,,3,,58.74886672710788
+C3_hf,High-heat-flow nodes that are high-b,C3,XSH,positive,,0,,58.74886672710788
+C1_rate,Low-b nodes with high strain rate,C1,WYN,classical,856.0,1681,50.92207019631172,50.0
+C2_rate,High-b nodes with low strain rate,C2,WYN,classical,1550.0,3068,50.521512385919166,50.0
+C1_regime,Contractional nodes that are low-b,C1,WYN,classical,483.0,1583,30.51168667087808,35.3969256685618
+C2_regime,Extensional nodes that are high-b,C2,WYN,classical,986.0,1583,62.28679722046747,64.6030743314382
+C1_mech,Thrust mechanisms in low-b nodes,C1,WYN,classical,,1,,35.3969256685618
+C2_mech,Normal mechanisms in high-b nodes,C2,WYN,classical,9.0,13,69.23076923076923,64.6030743314382
+C3_hf,High-heat-flow nodes that are high-b,C3,WYN,classical,455.0,599,75.95993322203672,64.6030743314382
+C1_rate,Low-b nodes with high strain rate,C1,WYN,positive,1110.0,2138,51.9176800748363,50.0
+C2_rate,High-b nodes with low strain rate,C2,WYN,positive,1347.0,2611,51.589429337418615,50.0
+C1_regime,Contractional nodes that are low-b,C1,WYN,positive,602.0,1583,38.02905874921036,45.02000421141293
+C2_regime,Extensional nodes that are high-b,C2,WYN,positive,785.0,1583,49.589387239418826,54.97999578858707
+C1_mech,Thrust mechanisms in low-b nodes,C1,WYN,positive,,1,,45.02000421141293
+C2_mech,Normal mechanisms in high-b nodes,C2,WYN,positive,8.0,13,61.53846153846154,54.97999578858707
+C3_hf,High-heat-flow nodes that are high-b,C3,WYN,positive,372.0,599,62.10350584307179,54.97999578858707
+C1_rate,Low-b nodes with high strain rate,C1,XJ,classical,356.0,715,49.79020979020979,50.0
+C2_rate,High-b nodes with low strain rate,C2,XJ,classical,509.0,1021,49.853085210577866,50.0
+C1_regime,Contractional nodes that are low-b,C1,XJ,classical,216.0,579,37.30569948186528,41.18663594470046
+C2_regime,Extensional nodes that are high-b,C2,XJ,classical,332.0,579,57.340241796200345,58.813364055299544
+C1_mech,Thrust mechanisms in low-b nodes,C1,XJ,classical,,0,,41.18663594470046
+C2_mech,Normal mechanisms in high-b nodes,C2,XJ,classical,,0,,58.813364055299544
+C3_hf,High-heat-flow nodes that are high-b,C3,XJ,classical,112.0,124,90.3225806451613,58.813364055299544
+C1_rate,Low-b nodes with high strain rate,C1,XJ,positive,260.0,610,42.622950819672134,50.0
+C2_rate,High-b nodes with low strain rate,C2,XJ,positive,518.0,1126,46.00355239786856,50.0
+C1_regime,Contractional nodes that are low-b,C1,XJ,positive,184.0,579,31.778929188255614,35.13824884792627
+C2_regime,Extensional nodes that are high-b,C2,XJ,positive,339.0,579,58.54922279792746,64.86175115207374
+C1_mech,Thrust mechanisms in low-b nodes,C1,XJ,positive,,0,,35.13824884792627
+C2_mech,Normal mechanisms in high-b nodes,C2,XJ,positive,,0,,64.86175115207374
+C3_hf,High-heat-flow nodes that are high-b,C3,XJ,positive,112.0,124,90.3225806451613,64.86175115207374
+C1_rate,Low-b nodes with high strain rate,C1,NCP,classical,1324.0,2496,53.044871794871796,50.0
+C2_rate,High-b nodes with low strain rate,C2,NCP,classical,2994.0,5836,51.30226182316655,50.0
+C1_regime,Contractional nodes that are low-b,C1,NCP,classical,550.0,2778,19.798416126709864,29.956793086893903
+C2_regime,Extensional nodes that are high-b,C2,NCP,classical,1650.0,2778,59.39524838012959,70.04320691310609
+C1_mech,Thrust mechanisms in low-b nodes,C1,NCP,classical,,1,,29.956793086893903
+C2_mech,Normal mechanisms in high-b nodes,C2,NCP,classical,,1,,70.04320691310609
+C3_hf,High-heat-flow nodes that are high-b,C3,NCP,classical,1130.0,1688,66.94312796208531,70.04320691310609
+C1_rate,Low-b nodes with high strain rate,C1,NCP,positive,952.0,2080,45.76923076923077,50.0
+C2_rate,High-b nodes with low strain rate,C2,NCP,positive,3038.0,6252,48.59245041586692,50.0
+C1_regime,Contractional nodes that are low-b,C1,NCP,positive,494.0,2778,17.782577393808495,24.963994239078254
+C2_regime,Extensional nodes that are high-b,C2,NCP,positive,1920.0,2778,69.11447084233261,75.03600576092174
+C1_mech,Thrust mechanisms in low-b nodes,C1,NCP,positive,,1,,24.963994239078254
+C2_mech,Normal mechanisms in high-b nodes,C2,NCP,positive,,1,,75.03600576092174
+C3_hf,High-heat-flow nodes that are high-b,C3,NCP,positive,1398.0,1688,82.81990521327015,75.03600576092174
+C1_rate,Low-b nodes with high strain rate,C1,NW,classical,3458.0,5540,62.418772563176894,50.0
+C2_rate,High-b nodes with low strain rate,C2,NW,classical,7168.0,12959,55.31290994675515,50.0
+C1_regime,Contractional nodes that are low-b,C1,NW,classical,1895.0,6166,30.733052221861822,32.997066241185856
+C2_regime,Extensional nodes that are high-b,C2,NW,classical,3096.0,6167,50.202691746392084,67.00293375881414
+C1_mech,Thrust mechanisms in low-b nodes,C1,NW,classical,28.0,85,32.94117647058823,32.997066241185856
+C2_mech,Normal mechanisms in high-b nodes,C2,NW,classical,4.0,14,28.571428571428573,67.00293375881414
+C3_hf,High-heat-flow nodes that are high-b,C3,NW,classical,494.0,1169,42.25834046193328,67.00293375881414
+C1_rate,Low-b nodes with high strain rate,C1,NW,positive,2747.0,3675,74.74829931972789,50.0
+C2_rate,High-b nodes with low strain rate,C2,NW,positive,8322.0,14824,56.13869400971398,50.0
+C1_regime,Contractional nodes that are low-b,C1,NW,positive,1540.0,6166,24.975673045734673,20.670132276493902
+C2_regime,Extensional nodes that are high-b,C2,NW,positive,4732.0,6167,76.73098751418843,79.3298677235061
+C1_mech,Thrust mechanisms in low-b nodes,C1,NW,positive,31.0,85,36.470588235294116,20.670132276493902
+C2_mech,Normal mechanisms in high-b nodes,C2,NW,positive,12.0,14,85.71428571428571,79.3298677235061
+C3_hf,High-heat-flow nodes that are high-b,C3,NW,positive,907.0,1169,77.58768177929855,79.3298677235061
