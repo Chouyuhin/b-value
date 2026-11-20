@@ -5,6 +5,7 @@ verbatim from bvalue4longmenshan.ipynb (cells 2 and 18) so the paper's settings 
 The sliding-window series `b_series` replicates seismostats.plots.plot_b_series_constant_nm
 (seismostats 1.0.0rc2, plots/statistical.py), which returns only axes.
 """
+import bisect
 import os
 from pathlib import Path
 
@@ -248,21 +249,33 @@ def window_span(label):
 
 
 # --------------------------------------------------------------------- b estimation
-def b_window(mags, times, mc, estimator_cls, delta_m=DELTA_M):
+def b_window(mags, times, mc, estimator_cls, delta_m=DELTA_M, dmc=None):
     """One estimate on a sample (events must be sorted by time for b-positive). Returns the estimator."""
     est = estimator_cls()
     mags = np.asarray(mags, float)
     if estimator_cls is BPositiveBValueEstimator:
-        est.calculate(mags, mc=mc, delta_m=delta_m, dmc=delta_m, times=np.asarray(times, dtype='datetime64[ns]'))
+        est.calculate(mags, mc=mc, delta_m=delta_m, dmc=delta_m if dmc is None else dmc,
+                      times=np.asarray(times, dtype='datetime64[ns]'))
     else:
         est.calculate(mags, mc=mc, delta_m=delta_m)
     return est
 
 
-def b_series(mags, times, mc, n_m, estimator_cls, delta_m=DELTA_M, step=1, min_num=2):
+def maxc(mags, delta_m=DELTA_M, correction=0.2):
+    """Maximum-curvature Mc of magnitudes already binned to delta_m: lowest modal bin + correction
+    (same result as seismostats.analysis.estimate_mc_maxc, without the histogram overhead)."""
+    vals, cnt = np.unique(np.asarray(mags, float), return_counts=True)
+    return float(np.round(vals[np.argmax(cnt)] + correction, 1))
+
+
+def b_series(mags, times, mc, n_m, estimator_cls, delta_m=DELTA_M, step=1, min_num=2,
+             per_window_mc=False, min_above=50, dmc=None):
     """Sliding window of n_m consecutive events with M >= mc - delta_m/2, value at the last event of the window
     (plot_technique='right' of seismostats.plots.plot_b_series_constant_nm).
-    Returns DataFrame(i_first, i_last, t_first, t_last, b, std, n); indices refer to the filtered, time-sorted sample."""
+    per_window_mc (classical only): each window is re-cut at mc_w = max(mc, MAXC + 0.2 of the window) and needs
+    >= min_above events above mc_w, else NaN (Gulia & Wiemer 2019 steps 5-6a; Gulia et al. 2018); mc is the floor.
+    dmc (b-positive only): minimum positive difference, default delta_m.
+    Returns DataFrame(i_first, i_last, t_first, t_last, b, std, n, mc_w); indices refer to the filtered, time-sorted sample."""
     mags = np.asarray(mags, float)
     times = np.asarray(times, dtype='datetime64[ns]')
     order = np.argsort(times, kind='stable')
@@ -270,18 +283,23 @@ def b_series(mags, times, mc, n_m, estimator_cls, delta_m=DELTA_M, step=1, min_n
     keep = mags >= mc - delta_m / 2
     mags, times = mags[keep], times[keep]
     positive = estimator_cls is BPositiveBValueEstimator
+    dmc = delta_m if dmc is None else dmc
     est = estimator_cls()
     rec = []
     for ii in range(0, len(mags) - n_m + 1, step):
         w_m = mags[ii:ii + n_m]
+        mc_w = mc
         if positive:
-            est.calculate(w_m, mc=mc, delta_m=delta_m, dmc=delta_m, times=times[ii:ii + n_m])
+            est.calculate(w_m, mc=mc, delta_m=delta_m, dmc=dmc, times=times[ii:ii + n_m])
+            ok = est.n >= min_num
         else:
-            est.calculate(w_m, mc=mc, delta_m=delta_m)
-        ok = est.n >= min_num
+            if per_window_mc:
+                mc_w = max(mc, maxc(w_m, delta_m))
+            est.calculate(w_m, mc=mc_w, delta_m=delta_m)
+            ok = est.n >= (min_above if per_window_mc else min_num)
         rec.append((ii, ii + n_m - 1, times[ii], times[ii + n_m - 1],
-                    est.b_value if ok else np.nan, est.std if ok else np.nan, est.n))
-    return pd.DataFrame(rec, columns=['i_first', 'i_last', 't_first', 't_last', 'b', 'std', 'n'])
+                    est.b_value if ok else np.nan, est.std if ok else np.nan, est.n, mc_w))
+    return pd.DataFrame(rec, columns=['i_first', 'i_last', 't_first', 't_last', 'b', 'std', 'n', 'mc_w'])
 
 
 def filtered_sample(df, mc, delta_m=DELTA_M):
@@ -314,35 +332,57 @@ def gardner_knopoff_km(m):
 
 
 # ================================================================== C4: temporal claims
-# Units = the seven main-text windows (Figs 4-10), each with its own N and Mc (Table S1); reference = the window's
-# whole-period b; targets = the events marked in panel (d) (fifth-largest rule); alarm duration 90 days.
+# Units = the seven main-text windows (Figs 4-10), each with its own N and Mc (Table S1); targets = the events marked in
+# panel (d) (fifth-largest rule). Rules revised 2026-10-29 to follow the published definitions:
+#   classical series re-cut per window at max(panel Mc, MAXC + 0.2), >= 50 events above Mc   (Gulia & Wiemer 2019, 5-6a)
+#   b-positive series: panel Mc, dmc = 0.1, no re-cut, no exclusion                            (van der Elst 2021)
+#   reference = median of the earlier windows of the panel sharing no event with the window,  (Gulia & Wiemer 2019, 6a;
+#               windows inside the Gardner-Knopoff time window of an earlier marked event      Gulia et al. 2018)
+#               excluded; fewer than MIN_REF -> regional 2008-2023 whole-period b              (Gulia & Wiemer 2019, 6b)
+#   drop = last window before the event <= reference - 10%                                     (Gulia & Wiemer 2019, 7)
+#   rise = first post-event window >= reference + 10%; classical post window starts when the   (Gulia & Wiemer 2019, 7;
+#          per-window Mc is back at the panel floor, b-positive at the first full window        Gulia et al. 2018)
 FIG_OF = {'LMS_2006-2010': 'Fig. 4', 'LMS_2011-2016': 'Fig. 5', 'XSH_2022-2023': 'Fig. 6', 'WYN_2020-2023': 'Fig. 7',
           'XJ_2016-2023': 'Fig. 8', 'NCP_2008-2023': 'Fig. 9', 'NW_2006-2023': 'Fig. 10'}
 MAIN_LABELS = list(FIG_OF)
 T_START, T_END = pd.Timestamp('2008-01-01'), pd.Timestamp('2023-08-14')   # catalogue ends 2023-08-13 (SI epicentre row)
-DROP = 0.10           # Gulia & Wiemer (2019): b at least 10% below the reference
-RISE = 0.10           # b at least 10% above the pre-event level
-POST_BLIND_DAYS = 7   # post-event window starts after this blind time (short-term aftershock incompleteness)
+DROP = 0.10           # Gulia & Wiemer (2019): b at least 10% below the reference (red)
+RISE = 0.10           # Gulia & Wiemer (2019): b at least 10% above the reference (green)
+MIN_ABOVE_MC = 50     # Gulia & Wiemer (2019) / Gulia et al. (2018): events above the per-window Mc needed for a classical b
 ALARM_DAYS = 7        # a drop is a hit when an M >= ALARM_TARGET_MAG follows within this many days (decided 2026-10-26)
-MIN_REF = 5           # windows needed before a reference (expanding mean) exists
+MIN_REF = 5           # eligible earlier windows needed for a panel reference; fewer -> regional whole-period b
 ALARM_TARGET_MAG = 4.0  # an alarm episode is a hit when an M >= this occurs in the window's region within ALARM_DAYS
 EDGE_DEG = 0.25
 
 _SERIES_CACHE = {}
+_BACKGROUND_CACHE = {}
 
 
-def series_for_window(label, estimator_cls, figrun):
-    """Sliding-window series of a paper window (its span, N and Mc), cached. Returns (series, sample)."""
-    key = (label, estimator_cls.__name__)
+def series_for_window(label, estimator_cls, figrun, dmc=None):
+    """Sliding-window series of a paper window (its span, N and Mc), cached. Classical windows are re-cut at the
+    per-window Mc (floor = panel Mc); b-positive uses the panel Mc and dmc (default 0.1). Returns (series, sample)."""
+    key = (label, estimator_cls.__name__, dmc)
     if key not in _SERIES_CACHE:
         region = figrun.loc[label, 'region']
         t0, t1 = window_span(label)
         df = load_region(region, t0, t1)
         mc, n_m = float(figrun.loc[label, 'mc']), int(figrun.loc[label, 'n_m'])
-        s = b_series(df['mag'], df['time'], mc, n_m, estimator_cls)
+        s = b_series(df['mag'], df['time'], mc, n_m, estimator_cls,
+                     per_window_mc=estimator_cls is ClassicBValueEstimator, min_above=MIN_ABOVE_MC, dmc=dmc)
         s['label'], s['mc'], s['n_m'] = label, mc, n_m
         _SERIES_CACHE[key] = (s, filtered_sample(df, mc), df)
     return _SERIES_CACHE[key][:2]
+
+
+def regional_background(region, estimator_cls, dmc=None):
+    """Whole-period b of a region over MAP_T0-MAP_T1 (Mc = MAXC + 0.2 of that catalogue), cached; the fallback
+    reference when a window has fewer than MIN_REF eligible earlier windows (Gulia & Wiemer 2019, step 6b)."""
+    key = (region, estimator_cls.__name__, dmc)
+    if key not in _BACKGROUND_CACHE:
+        df = load_region(region, MAP_T0, MAP_T1)
+        mc = float(estimate_mc_maxc(df['mag'].to_numpy(), fmd_bin=DELTA_M)[0])
+        _BACKGROUND_CACHE[key] = float(b_window(df['mag'], df['time'], mc, estimator_cls, dmc=dmc).b_value)
+    return _BACKGROUND_CACHE[key]
 
 
 def window_catalogue(label, figrun):
@@ -384,54 +424,88 @@ def targets(region, min_mag=6.0, t0=T_START, t1=T_END, cat=None):
     return ev.reset_index(drop=True)
 
 
-def window_c4(label, estimator_cls, figrun, alarm_days=ALARM_DAYS):
-    """C4 for one main-text window: marked events (drop before / rise after), alarm episodes (false alarms) and
-    the alarm fraction, relative to the pre-event expanding-mean reference. Returns (events, episodes, summary)."""
+TARGET_MAG = None     # None = the panel-(d) marked events (fifth-largest rule; kept by Yuxin 2026-10-29); 6.0 = M >= 6 only
+
+
+def window_c4(label, estimator_cls, figrun, alarm_days=ALARM_DAYS, dmc=None, target_mag=TARGET_MAG):
+    """C4 for one main-text window: target events (drop before / rise after the event, both relative to the
+    pre-event reference), alarm episodes (hits / false alarms) and the alarm fraction. Returns (events, episodes, summary).
+    target_mag=None falls back to the panel-(d) marked events (fifth-largest rule). See the rule block above for the
+    provenance of every rule."""
     region = figrun.loc[label, 'region']
     est = 'classical' if estimator_cls is ClassicBValueEstimator else 'positive'
     b_ww = float(figrun.loc[label, 'b_classical' if est == 'classical' else 'b_positive'])   # Table S1 value (figure line)
-    s, _ = series_for_window(label, estimator_cls, figrun)
+    s, _ = series_for_window(label, estimator_cls, figrun, dmc=dmc)
     df = window_catalogue(label, figrun)
     full = load_region(region)
+    b_reg = regional_background(region, estimator_cls, dmc=dmc)
     s = s.copy()
-    # reference of each window = mean of all earlier windows of the panel that share no event with it (pre-event
-    # expanding mean: the Gulia & Wiemer 'years preceding' rule applied inside the panel); needs >= MIN_REF windows
-    t_l = s['t_last'].to_numpy(dtype='datetime64[ns]'); t_f = s['t_first'].to_numpy(dtype='datetime64[ns]')
-    bb = s['b'].to_numpy(); hi = np.searchsorted(t_l, t_f, side='left')
-    csum = np.concatenate([[0.0], np.nancumsum(bb)]); cnt = np.concatenate([[0], np.cumsum(np.isfinite(bb))])
-    s['n_ref'] = cnt[hi]
-    s['ref'] = np.where(cnt[hi] >= MIN_REF, csum[hi] / np.maximum(cnt[hi], 1), np.nan)
-    s['rel'] = (s['b'] - s['ref']) / s['ref']
-    s['alarm'] = s['rel'] <= -DROP
     t_last = s['t_last'].to_numpy(dtype='datetime64[ns]'); t_first = s['t_first'].to_numpy(dtype='datetime64[ns]')
-    b = s['b'].to_numpy(); ref = s['ref'].to_numpy()
+    b = s['b'].to_numpy(); mc_w = s['mc_w'].to_numpy(float); mc0 = float(s['mc'].iloc[0])
     # ---- marked events of panel (d): every event with M >= the fifth-largest magnitude
     numbers, _, top = marked_events(df['mag'].to_numpy(), df['time'].to_numpy(), 6.0)
+    if target_mag is not None:
+        top = np.flatnonzero(df['mag'].to_numpy() >= target_mag)
+    mk_t = df['time'].to_numpy(dtype='datetime64[ns]')[top]
+    mk_m = df['mag'].to_numpy(float)[top]
+    # ---- reference of each window = median of all earlier windows of the panel that share no event with it, leaving
+    # out windows that end inside the Gardner-Knopoff time window of an earlier marked event (their b belongs to that
+    # sequence); fewer than MIN_REF eligible windows -> regional whole-period b (Gulia & Wiemer 2019, steps 6a/6b)
+    in_seq_w = np.zeros(len(s), bool)
+    for tm, mm in zip(mk_t, mk_m):
+        in_seq_w |= (t_last > tm) & (t_last <= tm + np.timedelta64(int(round(gardner_knopoff_days(mm) * 86400)), 's'))
+    eligible = np.isfinite(b) & ~in_seq_w
+    hi = np.searchsorted(t_last, t_first, side='left')        # windows 0..hi-1 end before this window starts
+    # Mc level used when a window has no panel reference: the median per-window Mc of the panel's pre-sequence windows
+    # (a catalogue property, so it need not be causal); the panel floor if there is none
+    mc_fallback = float(np.median(mc_w[eligible])) if eligible.any() else mc0
+    ref = np.full(len(s), np.nan); mc_ref = np.full(len(s), mc_fallback); n_ref = np.zeros(len(s), int)
+    pool, pool_mc, p = [], [], 0
+
+    def _median(x):
+        m = len(x) // 2
+        return x[m] if len(x) % 2 else 0.5 * (x[m - 1] + x[m])
+    for k in range(len(s)):
+        while p < hi[k]:
+            if eligible[p]:
+                bisect.insort(pool, b[p]); bisect.insort(pool_mc, mc_w[p])
+            p += 1
+        n_ref[k] = len(pool)
+        if len(pool) >= MIN_REF:
+            ref[k] = _median(pool); mc_ref[k] = _median(pool_mc)   # pre-event level of b and of the per-window Mc
+        else:
+            ref[k] = b_reg
+    s['in_seq_window'] = in_seq_w; s['n_ref'] = n_ref; s['ref'] = ref; s['mc_ref'] = mc_ref
+    s['ref_source'] = np.where(n_ref >= MIN_REF, 'panel', 'regional')
+    s['rel'] = (s['b'] - s['ref']) / s['ref']
+    s['alarm'] = s['rel'] <= -DROP
     ev_rows = []
-    for i in top:
+    for i, t_ev, m_ev in zip(top, mk_t, mk_m):
         r = df.iloc[i]
-        t_ev = np.datetime64(r['time'], 'ns')
         rec = dict(window=label, fig=FIG_OF[label], region=region, estimator=est, number=numbers[int(i)],
                    time=r['time'], mag=r['mag'], lon=r['lon'], lat=r['lat'],
-                   initiator=not flag_in_sequence(r, full), b_ww=b_ww, ref=np.nan,
-                   b_pre=np.nan, pre_days=np.nan, drop_rel=np.nan, drop=None,
-                   b_post=np.nan, post_start_days=np.nan, post_days=np.nan, rise_rel=np.nan, rise=None)
+                   initiator=not flag_in_sequence(r, full), b_ww=b_ww, ref=np.nan, ref_source=None, n_ref=0,
+                   b_pre=np.nan, mc_pre=np.nan, pre_days=np.nan, drop_rel=np.nan, drop=None,
+                   b_post=np.nan, mc_post=np.nan, post_start_days=np.nan, post_days=np.nan, rise_rel=np.nan, rise=None)
         k = np.searchsorted(t_last, t_ev, side='left') - 1          # last window ending before the event
-        if k >= 0 and np.isfinite(b[k]):
-            rec.update(b_pre=b[k], pre_days=(t_last[k] - t_first[k]) / np.timedelta64(1, 'D'), ref=ref[k])
-            if np.isfinite(ref[k]):
-                rec.update(drop_rel=(ref[k] - b[k]) / ref[k], drop=bool((ref[k] - b[k]) / ref[k] >= DROP))
-        if True:
-            j = np.searchsorted(t_first, t_ev + np.timedelta64(POST_BLIND_DAYS, 'D'), side='right')
-            if j < len(s) and np.isfinite(b[j]) and np.isfinite(rec['b_pre']):
-                rec.update(b_post=b[j], post_start_days=(t_first[j] - t_ev) / np.timedelta64(1, 'D'),
-                           post_days=(t_last[j] - t_first[j]) / np.timedelta64(1, 'D'),
-                           rise_rel=(b[j] - rec['b_pre']) / rec['b_pre'],
-                           rise=bool((b[j] - rec['b_pre']) / rec['b_pre'] >= RISE))
+        if k < 0:
+            ev_rows.append(rec); continue
+        rec.update(ref=ref[k], ref_source=s['ref_source'].iloc[k], n_ref=int(n_ref[k]), mc_ref=mc_ref[k])
+        if np.isfinite(b[k]):
+            rec.update(b_pre=b[k], mc_pre=mc_w[k], pre_days=(t_last[k] - t_first[k]) / np.timedelta64(1, 'D'),
+                       drop_rel=(ref[k] - b[k]) / ref[k], drop=bool((ref[k] - b[k]) / ref[k] >= DROP))
+        # post-event window: first window whose events all follow the event; classical additionally waits until the
+        # per-window Mc is back at its pre-event level (median per-window Mc of the reference windows; panel floor when
+        # the reference is regional) -- Gulia et al. 2018: events removed until Mc(t) matches the pre-cut level
+        j = np.searchsorted(t_first, t_ev, side='right')
+        while j < len(s) and not (np.isfinite(b[j]) and (est == 'positive' or mc_w[j] <= mc_ref[k] + 1e-9)):
+            j += 1
+        if j < len(s):
+            rec.update(b_post=b[j], mc_post=mc_w[j], post_start_days=(t_first[j] - t_ev) / np.timedelta64(1, 'D'),
+                       post_days=(t_last[j] - t_first[j]) / np.timedelta64(1, 'D'),
+                       rise_rel=(b[j] - ref[k]) / ref[k], rise=bool((b[j] - ref[k]) / ref[k] >= RISE))
         ev_rows.append(rec)
     events = pd.DataFrame(ev_rows)
-    mk_t = events['time'].to_numpy(dtype='datetime64[ns]') if len(events) else np.array([], dtype='datetime64[ns]')
-    mk_m = events['mag'].to_numpy(float) if len(events) else np.array([])
     tg_t = df.loc[df['mag'] >= ALARM_TARGET_MAG, 'time'].to_numpy(dtype='datetime64[ns]')   # alarm targets: M >= 4 in the window
     # ---- alarm episodes: runs of consecutive alarm windows
     alarm = s['alarm'].to_numpy(bool) & np.isfinite(b)
@@ -462,8 +536,10 @@ def window_c4(label, estimator_cls, figrun, alarm_days=ALARM_DAYS):
     days = np.arange(t0, t1, np.timedelta64(1, 'D'))
     ref_share = float(np.mean([np.any((tg_t > d) & (tg_t <= d + dur)) for d in days])) if len(days) else np.nan
     summary = dict(window=label, fig=FIG_OF[label], region=region, estimator=est, n_m=int(s['n_m'].iloc[0]),
-                   mc=float(s['mc'].iloc[0]), b_ww=b_ww, n_windows=len(s), n_alarm_windows=int(alarm.sum()),
-                   n_marked=len(events),
+                   mc=float(s['mc'].iloc[0]), b_ww=b_ww, b_regional=b_reg, n_windows=len(s),
+                   n_windows_valid=int(np.isfinite(b).sum()), n_windows_in_seq=int(in_seq_w.sum()),
+                   n_alarm_windows=int(alarm.sum()), n_marked=len(events),
+                   n_ref_regional=int((events['ref_source'] == 'regional').sum()) if len(events) else 0,
                    drop_k=int(events['drop'].dropna().astype(bool).sum()) if len(events) else 0,
                    drop_n=int(events['drop'].notna().sum()) if len(events) else 0,
                    rise_k=int(events['rise'].dropna().astype(bool).sum()) if len(events) else 0,

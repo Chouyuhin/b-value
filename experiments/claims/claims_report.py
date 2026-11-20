@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm, LinearSegmentedColormap, Normalize
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Polygon, Ellipse
 from matplotlib.lines import Line2D
 
 from claims_lib import *
@@ -24,18 +24,19 @@ plt.rcParams.update({'font.family': 'sans-serif', 'font.size': 8, 'axes.edgecolo
                      'pdf.fonttype': 42, 'savefig.facecolor': 'white'})
 
 ROWS = [  # spatial rows (key, label, claim group, base kind)
-    ('C1_rate', 'Low-b nodes with high strain rate', 'C1', 'half'),
-    ('C2_rate', 'High-b nodes with low strain rate', 'C2', 'half'),
+    # 2026-10-29: the two strain-rate rows were merged into one (low-b & high rate + high-b & low rate over all nodes with
+    # strain data, chance = 50% because the strain split is at the node median); the two GCMT mechanism rows were removed
+    # (only LMS thrust, WYN normal and NW reached 10 mechanisms). The old keys stay in build_table for events_*.csv readers.
+    ('C12_rate', 'b and strain rate on opposite sides\n(low-b & high rate, high-b & low rate)', 'C1-C2', 'half'),
     ('C1_regime', 'Contractional nodes that are low-b', 'C1', 'low'),
     ('C2_regime', 'Extensional nodes that are high-b', 'C2', 'high'),
-    ('C1_mech', 'Thrust mechanisms in low-b nodes', 'C1', 'low'),
-    ('C2_mech', 'Normal mechanisms in high-b nodes', 'C2', 'high'),
     ('C3_hf', 'High-heat-flow nodes that are high-b', 'C3', 'high'),
 ]
 C4_COLS = [  # temporal columns (key, label)
     ('drop', 'Marked events preceded by a b drop'),
     ('rise', 'Marked events followed by a b rise'),
-    ('hit', 'Drops followed by an M>=4 within 7 d'),
+    # ('hit', 'Drops followed by an M>=4 within 7 d'),  removed 2026-10-29: a false-alarm count needs an a priori target
+    # and validity window that regional windows cannot supply; alarm episodes are still written to alarms_C4.csv
 ]
 
 
@@ -43,39 +44,77 @@ def _pct(k, n):
     return 100.0 * k / n if n else np.nan
 
 
+def utsu_p(b1, n1, b2, n2):
+    """Utsu (1992) probability that two samples (b1, n1) and (b2, n2) share one b value, as written in
+    Wiemer & Wyss (1997, JGR 102, eq. after Utsu 1992): P = exp(-dA/2 - 2),
+    dA = -2 n ln n + 2 n1 ln(n1 + n2 b1/b2) + 2 n2 ln(n1 b2/b1 + n2) - 2, n = n1 + n2."""
+    b1, n1, b2, n2 = (np.asarray(x, float) for x in (b1, n1, b2, n2))
+    n = n1 + n2
+    dA = -2 * n * np.log(n) + 2 * n1 * np.log(n1 + n2 * b1 / b2) + 2 * n2 * np.log(n1 * b2 / b1 + n2) - 2
+    return np.exp(-dA / 2 - 2)
+
+
+P_SIG = 0.05   # Utsu-test level of the sensitivity rows (*_utsu in claims_table.csv): low-b / high-b only if the test rejects
+               # b_node = b0 (Wiemer & Wyss 1997; Schorlemmer et al. 2004, 2005). Main rows: plain below/above-b0 split
+               # (Schorlemmer et al. 2005, classes relative to the regional average b); Yuxin's choice 2026-10-30 after the
+               # Utsu version showed the same direction in every cell.
+
+
+def node_classes(v, bcol, ncol, b0, n0, sig=True):
+    """Boolean (low, high) node masks: below/above the regional b0; with sig=True also Utsu p < P_SIG."""
+    low, high = v[bcol] < b0, v[bcol] > b0
+    if sig:
+        p = utsu_p(v[bcol].to_numpy(), v[ncol].to_numpy(), b0, n0)
+        low, high = low & (p < P_SIG), high & (p < P_SIG)
+    return low, high
+
+
 def build_table(thr, gcmt, min_cov_nodes=20, min_mech=10):
-    """Long table of the spatial rows: one row per (claim row, region, estimator) with k, n, pct, base."""
+    """Long table of the spatial rows: one row per (claim row, region, estimator) with k, n, pct, base.
+
+    Rows of ROWS use the plain below/above-b0 split; the same rows restricted to nodes whose b differs from b0 at
+    Utsu p < P_SIG are appended with the suffix _utsu (sensitivity, CSV only)."""
     out = []
+    extra = [('C1_rate', 'Low-b nodes with high strain rate', 'C1'), ('C2_rate', 'High-b nodes with low strain rate', 'C2'),
+             ('C1_mech', 'Thrust mechanisms in low-b nodes', 'C1'), ('C2_mech', 'Normal mechanisms in high-b nodes', 'C2')]
     for region in REGIONS:
         nd = pd.read_csv(OUT / f'nodes_{region}.csv')
         g = gcmt[in_box(gcmt.lon, gcmt.lat, BOXES[region]) & (gcmt.mw >= 5.0)]
         for est, bcol in (('classical', 'b_c'), ('positive', 'b_p')):
-            b0 = thr.loc[region, 'b_c' if est == 'classical' else 'b_p']
-            v = nd[np.isfinite(nd[bcol])]
-            low, high = v[bcol] < b0, v[bcol] > b0
-            base_low, base_high = 100 * low.mean(), 100 * high.mean()
-            rec = {}
-            s_ = v[np.isfinite(v.ws_e2inv)]
-            sl, sh = s_[bcol] < b0, s_[bcol] > b0
-            hs = s_.ws_e2inv > s_.ws_e2inv.median()
-            rec['C1_rate'] = ((sl & hs).sum(), sl.sum(), 50.0)
-            rec['C2_rate'] = ((sh & ~hs).sum(), sh.sum(), 50.0)
-            q1, q2 = s_.ws_dilat.quantile([1 / 3, 2 / 3])
-            contr, ext = s_.ws_dilat <= q1, s_.ws_dilat >= q2
-            rec['C1_regime'] = ((contr & sl).sum(), contr.sum(), base_low)
-            rec['C2_regime'] = ((ext & sh).sum(), ext.sum(), base_high)
-            bn = nearest_node_value(nd, g.lon.to_numpy(), g.lat.to_numpy(), col=bcol) if len(g) else np.array([])
-            th = (g['style'] == 'thrust').to_numpy() & np.isfinite(bn)
-            no = (g['style'] == 'normal').to_numpy() & np.isfinite(bn)
-            rec['C1_mech'] = ((bn[th] < b0).sum(), th.sum(), base_low) if th.sum() >= min_mech else (np.nan, th.sum(), base_low)
-            rec['C2_mech'] = ((bn[no] > b0).sum(), no.sum(), base_high) if no.sum() >= min_mech else (np.nan, no.sum(), base_high)
-            vh = v[np.isfinite(v.hf)]
-            hh = vh.hf > vh.hf.median()
-            rec['C3_hf'] = (((vh[bcol] > b0) & hh).sum(), hh.sum(), base_high) if (len(vh) >= min_cov_nodes and region != 'XSH') else (np.nan, 0, base_high)
-            for key, label, grp, _ in ROWS:
-                k, n, base = rec[key]
-                out.append(dict(row=key, label=label, claim=grp, region=region, estimator=est,
-                                k=k, n=n, pct=_pct(k, n) if np.isfinite(k) else np.nan, base=base))
+            b0 = thr.loc[region, bcol]
+            ncol = 'n_c' if est == 'classical' else 'n_p'
+            n0 = thr.loc[region, ncol] if ncol in thr.columns else thr.loc[region, 'n'] * (1.0 if est == 'classical' else 0.5)
+            v = nd[np.isfinite(nd[bcol])].copy()
+            for sig, suffix in ((False, ''), (True, '_utsu')):
+                low, high = node_classes(v, bcol, ncol, b0, n0, sig=sig)
+                v['low'], v['high'] = low.to_numpy(), high.to_numpy()
+                base_low, base_high = 100 * low.mean(), 100 * high.mean()
+                share = (base_low, base_high, 100 * (~low & ~high).mean())
+                rec = {}
+                s_ = v[np.isfinite(v.ws_e2inv)]
+                sl, sh = s_.low, s_.high
+                hs = s_.ws_e2inv > s_.ws_e2inv.median()
+                rec['C1_rate'] = ((sl & hs).sum(), sl.sum(), 50.0)
+                rec['C2_rate'] = ((sh & ~hs).sum(), sh.sum(), 50.0)
+                rec['C12_rate'] = ((sl & hs).sum() + (sh & ~hs).sum(), sl.sum() + sh.sum(), 50.0)
+                q1, q2 = s_.ws_dilat.quantile([1 / 3, 2 / 3])
+                contr, ext = s_.ws_dilat <= q1, s_.ws_dilat >= q2
+                rec['C1_regime'] = ((contr & sl).sum(), contr.sum(), base_low)
+                rec['C2_regime'] = ((ext & sh).sum(), ext.sum(), base_high)
+                nl = nearest_node_value(v, g.lon.to_numpy(), g.lat.to_numpy(), col='low') if len(g) else np.array([])
+                nh = nearest_node_value(v, g.lon.to_numpy(), g.lat.to_numpy(), col='high') if len(g) else np.array([])
+                th = (g['style'] == 'thrust').to_numpy() & np.isfinite(nl)
+                no = (g['style'] == 'normal').to_numpy() & np.isfinite(nh)
+                rec['C1_mech'] = ((nl[th] > 0.5).sum(), th.sum(), base_low) if th.sum() >= min_mech else (np.nan, th.sum(), base_low)
+                rec['C2_mech'] = ((nh[no] > 0.5).sum(), no.sum(), base_high) if no.sum() >= min_mech else (np.nan, no.sum(), base_high)
+                vh = v[np.isfinite(v.hf)]
+                hh = vh.hf > vh.hf.median()
+                rec['C3_hf'] = ((vh.high & hh).sum(), hh.sum(), base_high) if (len(vh) >= min_cov_nodes and region != 'XSH') else (np.nan, 0, base_high)
+                for key, label, grp in [(k_, l_, g_) for k_, l_, g_, _ in ROWS] + extra:   # extra rows go to the CSV only
+                    k, n, base = rec[key]
+                    out.append(dict(row=key + suffix, label=label, claim=grp, region=region, estimator=est,
+                                    k=k, n=n, pct=_pct(k, n) if np.isfinite(k) else np.nan, base=base,
+                                    share_low=share[0], share_high=share[1], share_neutral=share[2]))
     return pd.DataFrame(out)
 
 
@@ -102,15 +141,16 @@ def table_markdown(tab, c4):
     lines = ['**Spatial claims** (cell = k/n (%), classical | positive; ref. = share expected with no relation)', '',
              '| Claim | Row | ' + ' | '.join(REGIONS) + ' |', '|' + '---|' * (len(REGIONS) + 2)]
     for key, label, grp, basek in ROWS:
-        cells = []
+        label = label.replace('\n', ' '); cells = []
         for region in REGIONS:
             parts = []
             for est in ('classical', 'positive'):
                 r = tab[(tab.row == key) & (tab.region == region) & (tab.estimator == est)].iloc[0]
-                parts.append(f'{int(r.k)}/{int(r.n)} ({r.pct:.0f}%)' if np.isfinite(r.pct) else 'n/a')
+                parts.append(f'{int(r.k)}/{int(r.n)} ({r.pct:.0f}%)' if np.isfinite(r.pct)
+                             else (f'n/a ({int(r.n)})' if key.endswith('_mech') else 'n/a'))   # mech: n/a shows the mechanism count
             b2 = tab[(tab.row == key) & (tab.region == region)].base.tolist()
             ref = 'ref. 50%' if basek == 'half' else f'ref. {b2[0]:.0f}/{b2[1]:.0f}%'
-            cells.append(' \\| '.join(parts) + ('' if parts == ['n/a', 'n/a'] else f'<br>{ref}'))
+            cells.append(' \\| '.join(parts) + ('' if all(p.startswith('n/a') for p in parts) else f'<br>{ref}'))
         lines.append(f'| {grp} | {label} | ' + ' | '.join(cells) + ' |')
     lines += ['', '**Temporal claims (C4), main-text windows** (cell = k/n (%), classical | positive)', '',
               '| Window | Marked events | ' + ' | '.join(l for _, l in C4_COLS) + ' |',
@@ -121,19 +161,88 @@ def table_markdown(tab, c4):
             parts = []
             for est in ('classical', 'positive'):
                 r = c4[(c4.col == key) & (c4.fig == fig) & (c4.estimator == est)].iloc[0]
-                parts.append(f'{int(r.k)}/{int(r.n)} ({r.pct:.0f}%)' if np.isfinite(r.pct) else f'n/a (0/{int(r.n)})' if key == 'hit' else 'n/a')
-            cell = ' \\| '.join(parts)
-            if key == 'hit' and fig != 'Total':
-                rs = c4[(c4.col == 'hit') & (c4.fig == fig)].hit_ref_share.iloc[0]
-                cell += f'<br>random date: {100 * rs:.0f}%'
-            cells.append(cell)
-        r0 = c4[(c4.col == 'hit') & (c4.fig == fig)]
+                parts.append(f'{int(r.k)}/{int(r.n)} ({r.pct:.0f}%)' if np.isfinite(r.pct) else 'n/a')
+            cells.append(' \\| '.join(parts))
+        r0 = c4[(c4.col == 'drop') & (c4.fig == fig)]
         lines.append(f'| {fig} {r0.window.iloc[0]} | {int(r0.n_marked.iloc[0])} | ' + ' | '.join(cells) + ' |')
+    sh = []
+    for region in REGIONS:
+        r2 = [tab[(tab.row == 'C12_rate') & (tab.region == region) & (tab.estimator == e)].iloc[0] for e in ('classical', 'positive')]
+        sh.append(f'{region} ' + ' \\| '.join(f'{r.share_low:.0f}/{r.share_high:.0f}' for r in r2))
     lines.append('')
-    lines.append('Drops = alarm episodes (runs of windows >= 10% below their reference). A drop counts as a hit when an M>=4 occurs in the '
-                 'window region within the following 7 days; false-alarm rate = 100% minus the hit rate; "random date" = share of days in the window '
-                 'followed by an M>=4 within 7 days (chance reference).')
+    lines.append('Node classes low / high (% of valid nodes, classical | positive): ' + '; '.join(sh) + '.')
+    lines.append('')
+    lines.append('Drop = last window before the event >= 10% below the pre-sequence reference (median of the earlier windows of the panel); '
+                 'rise = first post-event window >= 10% above the same reference; n = marked events with a valid window. '
+                 'Low-b / high-b node = below / above the regional whole-period b (b0; Schorlemmer et al. 2005, classes relative '
+                 'to the regional average). Restricting the classes to nodes that differ from b0 at Utsu (1992) p < 0.05 '
+                 '(Wiemer & Wyss 1997; Schorlemmer et al. 2004) leaves the direction of every cell unchanged (rows *_utsu in '
+                 'claims_table.csv). Strain-rate row: n = all nodes with strain data; chance = 50% because the strain split is '
+                 'at the node median.')
     return '\n'.join(lines)
+
+
+# ------------------------------------------------------------------ C4 per-event table (Form B, chosen 2026-10-29)
+SYM_YES, SYM_NO, SYM_NA = '●', '○', '·'   # filled circle, open circle, middle dot
+
+
+def _sym(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return SYM_NA
+    return SYM_YES if bool(v) else SYM_NO
+
+
+def c4_event_table(events):
+    """Form B of the C4 result: one row per main-text window, one cell per marked event in time order.
+
+    Cell = magnitude, '*' if the event is an aftershock of an earlier marked event (not a sequence initiator),
+    then two symbols: left = classical, right = b-positive; filled = criterion met, open = not met, dot = no valid window.
+    Returns (long DataFrame, markdown string). The markdown table shows the drop symbols and the drop k/n of both estimators;
+    the rise results are summarised in the footnote because almost no event meets the rise criterion.
+    """
+    ev = events.copy()
+    ev['time'] = pd.to_datetime(ev['time'])
+    rows, n_cols = [], 0
+    for lab in MAIN_LABELS:
+        g = ev[ev.window == lab]
+        if g.empty:
+            continue
+        keys = sorted(set(zip(g.time, g.mag)))
+        n_cols = max(n_cols, len(keys))
+        for i, (t, m) in enumerate(keys, 1):
+            gg = g[(g.time == t) & (g.mag == m)]
+            r = {x.estimator: x for x in gg.itertuples()}
+            c, p = r.get('classical'), r.get('positive')
+            a = c if c is not None else p
+            rows.append(dict(window=lab, fig=FIG_OF[lab], idx=i, time=t, mag=m, initiator=bool(a.initiator),
+                             drop_c=getattr(c, 'drop', np.nan), drop_p=getattr(p, 'drop', np.nan),
+                             rise_c=getattr(c, 'rise', np.nan), rise_p=getattr(p, 'rise', np.nan),
+                             drop_rel_c=getattr(c, 'drop_rel', np.nan), drop_rel_p=getattr(p, 'drop_rel', np.nan),
+                             rise_rel_c=getattr(c, 'rise_rel', np.nan), rise_rel_p=getattr(p, 'rise_rel', np.nan)))
+    long = pd.DataFrame(rows)
+
+    def kn(col, g):
+        v = g[col]
+        ok = v.notna()
+        return f'{int(v[ok].astype(bool).sum())}/{int(ok.sum())}'
+
+    lines = ['**C4 per marked event, main-text windows** (cell = magnitude, * = aftershock of an earlier marked event, '
+             'then classical | positive: ' + SYM_YES + ' drop before, ' + SYM_NO + ' no drop, ' + SYM_NA + ' no valid window)', '',
+             '| Window | ' + ' | '.join(f'{i}' for i in range(1, n_cols + 1)) + ' | Drop, c \\| p |',
+             '|' + '---|' * (n_cols + 2)]
+    rise_note = []
+    for lab in MAIN_LABELS:
+        g = long[long.window == lab]
+        if g.empty:
+            continue
+        cells = [f'{r.mag:.1f}{"" if r.initiator else "*"} {_sym(r.drop_c)}{_sym(r.drop_p)}' for r in g.itertuples()]
+        cells += [''] * (n_cols - len(cells))
+        lines.append(f'| {FIG_OF[lab]} {lab} | ' + ' | '.join(cells) + f' | {kn("drop_c", g)} \\| {kn("drop_p", g)} |')
+        rise_note.append(f'{FIG_OF[lab]} {kn("rise_c", g)} | {kn("rise_p", g)}')
+    lines += ['', 'Rise after (first post-event window >= 10% above the same reference), classical | positive: ' + '; '.join(rise_note) + '.',
+              'Drop = last window ending before the event >= 10% below the pre-sequence reference (median of the earlier '
+              'windows of the panel outside earlier sequences); events in time order within each window.']
+    return long, '\n'.join(lines)
 
 
 # ------------------------------------------------------------------------------- figures
@@ -151,14 +260,16 @@ def _cell(ax, x0, y0, w, h, pct, est, k, n, invert=False):
         ax.text(x0 + w / 2, y0 + 0.55, 'n/a', ha='center', va='center', fontsize=6.5, color=MUTED)
 
 
-def fig_summary(tab, c4, path):
-    """(a) spatial claims x regions; (b) temporal claims x main-text windows. Cells split classical | positive;
-    colour = % supporting the claim (false-alarm column shaded by its complement), text = k/n."""
+def fig_summary(tab, c4, path, events=None):
+    """(a) spatial claims x regions, cells split classical | positive, colour = % supporting, text = k/n;
+    (b) temporal claims: one glyph per marked event of each main-text window (left half classical, right half
+    positive; filled = criterion met), size = magnitude, dashed outline = aftershock of an earlier marked event,
+    and the k/n of both estimators at the end of each strip."""
     nrow, ncol = len(ROWS), len(REGIONS)
     wins = [FIG_OF[l] for l in MAIN_LABELS]
     nrow2, ncol2 = len(wins), len(C4_COLS)
     fig = plt.figure(figsize=(7.2, 0.42 * (nrow + nrow2) + 3.0))
-    gs = fig.add_gridspec(2, 1, height_ratios=[nrow + 1.2, nrow2 + 1.9], hspace=0.42, left=0.40, right=0.955, top=0.95, bottom=0.10)
+    gs = fig.add_gridspec(2, 1, height_ratios=[nrow + 1.2, nrow2 + 1.9], hspace=0.42, left=0.40, right=0.955, top=0.95, bottom=0.12)
     REF = {'half': 'ref. 50%', 'low': 'ref. share of low-b nodes', 'high': 'ref. share of high-b nodes'}
     # (a)
     ax = fig.add_subplot(gs[0]); ax.set_xlim(0, ncol); ax.set_ylim(nrow, 0); ax.axis('off')
@@ -167,38 +278,76 @@ def fig_summary(tab, c4, path):
             for h, est in enumerate(('classical', 'positive')):
                 r = tab[(tab.row == key) & (tab.region == region) & (tab.estimator == est)].iloc[0]
                 _cell(ax, j + 0.5 * h, i, 0.5, 1, r.pct, est, r.k, r.n)
-        ax.text(-0.08, i + 0.40, label, ha='right', va='center', fontsize=7, color=INK)
-        ax.text(-0.08, i + 0.74, REF[basek], ha='right', va='center', fontsize=5.5, color=MUTED)
-        if i in (2, 6):
-            ax.plot([0, ncol], [i, i], color='white', lw=3)
+        ax.text(-0.08, i + 0.36, label, ha='right', va='center', fontsize=7, color=INK, linespacing=0.95)
+        ax.text(-0.08, i + 0.76, REF[basek], ha='right', va='center', fontsize=5.5, color=MUTED)
+        if i > 0 and grp.startswith('C3') and not ROWS[i - 1][2].startswith('C3'):
+            ax.plot([0, ncol], [i, i], color='white', lw=3)   # gap between the stress rows and the fluid rows
     for j, region in enumerate(REGIONS):
         name = {'LMS': 'Longmen-\nshan', 'XSH': 'Xianshui-\nhe', 'WYN': 'Western\nYunnan', 'XJ': 'Xiaojiang', 'NCP': 'North\nChina Plain', 'NW': 'Northwest\nChina'}[region]
         ax.text(j + 0.5, -0.45, name, ha='center', va='center', fontsize=6.8, fontweight='semibold', color=INK, linespacing=0.95)
         ax.text(j + 0.25, -0.07, 'classical', ha='center', va='center', fontsize=5.3, color=EST_COL['classical'])
         ax.text(j + 0.75, -0.07, 'positive', ha='center', va='center', fontsize=5.3, color=EST_COL['positive'])
     ax.text(-0.08, -0.6, 'a  Spatial claims, 2008\u20132023 maps', ha='right', va='center', fontsize=8, fontweight='bold', color=INK)
-    for grp, y in (('Stress (C1, C2)', 3.0), ('Fluids (C3)', 6.5)):
+    n_stress = sum(not g.startswith('C3') for _, _, g, _ in ROWS)
+    for grp, y in (('Stress (C1, C2)', n_stress / 2), ('Fluids (C3)', n_stress + (nrow - n_stress) / 2)):
         ax.text(ncol + 0.08, y, grp, rotation=270, ha='left', va='center', fontsize=7, color=INK2)
-    # (b)
-    ax = fig.add_subplot(gs[1]); ax.set_xlim(0, ncol2); ax.set_ylim(nrow2, 0); ax.axis('off')
-    for i, figname in enumerate(wins):
-        for j, (key, label) in enumerate(C4_COLS):
+    # (b) one glyph per marked event
+    ax = fig.add_subplot(gs[1]); ax.set_xlim(0, 2); ax.set_ylim(nrow2, 0); ax.axis('off')
+    bb = ax.get_position()
+    xpp = 2 / (bb.width * fig.get_figwidth() * 72); ypp = nrow2 / (bb.height * fig.get_figheight() * 72)   # data units per point
+    ev = events.copy(); ev['time'] = pd.to_datetime(ev['time'])
+    n_max = int(ev.groupby(['window', 'estimator']).size().max()); dx = 0.66 / n_max
+
+    def tri(v):
+        if isinstance(v, str):
+            return {'True': True, 'False': False}.get(v)
+        return None if v is None or (isinstance(v, float) and np.isnan(v)) else bool(v)
+
+    def glyph(cx, cy, m, yes_c, yes_p, dashed):
+        r = 2.6 + 2.9 * (min(max(m, 4.4), 7.9) - 4.4) / 3.5          # radius in points
+        for half, yes in (('L', yes_c), ('R', yes_p)):
+            th = np.linspace(np.pi / 2, 3 * np.pi / 2, 30) if half == 'L' else np.linspace(-np.pi / 2, np.pi / 2, 30)
+            col = EST_COL['classical' if half == 'L' else 'positive']
+            fc = col if yes is True else ('#e1e0d9' if yes is None else 'white')
+            ax.add_patch(Polygon(np.column_stack([cx + r * xpp * np.cos(th), cy + r * ypp * np.sin(th)]), closed=True, fc=fc, ec='none', zorder=3, clip_on=False))
+        ax.add_patch(Ellipse((cx, cy), 2 * r * xpp, 2 * r * ypp, fc='none', ec=INK2, lw=0.55, ls=(0, (1.5, 1.2)) if dashed else '-', zorder=4, clip_on=False))
+        return r
+    for i, (label_w, figname) in enumerate(zip(MAIN_LABELS, wins)):
+        ec = ev[(ev.window == label_w) & (ev.estimator == 'classical')].sort_values('time').reset_index(drop=True)
+        ep = ev[(ev.window == label_w) & (ev.estimator == 'positive')].sort_values('time').reset_index(drop=True)
+        cy = i + 0.58
+        for g, key in enumerate(('drop', 'rise')):
+            for k in range(len(ec)):
+                cx = g + 0.03 + dx * (k + 0.5)
+                r = glyph(cx, cy, ec.mag[k], tri(ec[key][k]), tri(ep[key][k]), not bool(ec.initiator[k]))
+                if ec.mag[k] >= 6:
+                    ax.text(cx, cy - (r + 1.2) * ypp, f'{ec.mag[k]:.1f}', ha='center', va='bottom', fontsize=4.8, color=INK2)
             for h, est in enumerate(('classical', 'positive')):
-                r = c4[(c4.col == key) & (c4.fig == figname) & (c4.estimator == est)].iloc[0]
-                _cell(ax, j + 0.5 * h, i, 0.5, 1, r.pct, est, r.k, r.n)
-        r0 = c4[(c4.col == 'hit') & (c4.fig == figname)]
-        lab = f"{figname}  {REGION_NAME[r0.window.iloc[0].split('_')[0]]} {r0.window.iloc[0].split('_')[1]}"
-        ax.text(-0.08, i + 0.40, lab, ha='right', va='center', fontsize=7, color=INK)
-        sub = f"{int(r0.n_marked.iloc[0])} marked events" + (f" \u00b7 random date followed by M\u22654 within 7 d: {100 * r0.hit_ref_share.iloc[0]:.0f}%" if np.isfinite(r0.hit_ref_share.iloc[0]) else '')
-        ax.text(-0.08, i + 0.74, sub, ha='right', va='center', fontsize=5.2, color=MUTED)
-    for j, (key, label) in enumerate(C4_COLS):
-        short = {'drop': 'Marked events\npreceded by\na b drop', 'rise': 'Marked events\nfollowed by\na b rise',
-                 'hit': 'Drops followed\nby an M\u22654\nwithin 7 d'}[key]
-        ax.text(j + 0.5, -0.55, short, ha='center', va='center', fontsize=6.2, fontweight='semibold', color=INK, linespacing=0.95)
-        ax.text(j + 0.25, -0.07, 'classical', ha='center', va='center', fontsize=5.3, color=EST_COL['classical'])
-        ax.text(j + 0.75, -0.07, 'positive', ha='center', va='center', fontsize=5.3, color=EST_COL['positive'])
-    ax.text(-0.08, -0.9, 'b  Temporal claims (C4), main-text windows', ha='right', va='center', fontsize=8, fontweight='bold', color=INK)
-    ax.text(-0.08, nrow2 + 0.35, 'Drops: text = hits / drops; false-alarm rate = 100% \u2212 hit rate.', fontsize=5.5, color=MUTED, va='center')
+                rr = c4[(c4.col == key) & (c4.fig == figname) & (c4.estimator == est)].iloc[0]
+                ax.text(g + 0.785 + 0.175 * h, cy, f'{int(rr.k)}/{int(rr.n)}' if np.isfinite(rr.pct) else 'n/a',
+                        ha='center', va='center', fontsize=6.5, color=EST_COL[est], fontweight='semibold')
+        lab = f"{figname}  {REGION_NAME[label_w.split('_')[0]]} {label_w.split('_')[1]}"
+        ax.text(-0.03, i + 0.42, lab, ha='right', va='center', fontsize=7, color=INK)
+        ax.text(-0.03, i + 0.74, f"{len(ec)} events · {int((ec.mag >= 6).sum())} with M≥6", ha='right', va='center', fontsize=5.2, color=MUTED)
+        if i:
+            ax.plot([0, 2], [i, i], color=GRID, lw=0.4, zorder=1)
+    for g, short in enumerate(('Marked events preceded by a b drop', 'Marked events followed by a b rise')):
+        ax.text(g + 0.5, -0.55, short, ha='center', va='center', fontsize=6.6, fontweight='semibold', color=INK)
+        ax.text(g + 0.05, -0.12, 'time →', ha='left', va='center', fontsize=5, color=MUTED)
+        ax.text(g + 0.785, -0.12, 'classical', ha='center', va='center', fontsize=5.1, color=EST_COL['classical'])
+        ax.text(g + 0.96, -0.12, 'positive', ha='center', va='center', fontsize=5.1, color=EST_COL['positive'])
+    from matplotlib.transforms import blended_transform_factory
+    ax.text(0.03, -0.9, 'b  Temporal claims (C4), main-text windows', transform=blended_transform_factory(fig.transFigure, ax.transData),
+            ha='left', va='center', fontsize=8, fontweight='bold', color=INK)
+    # legend glyphs
+    items = [((True, True, False), 'met by both estimators'), ((True, False, False), 'b-classical only'), ((False, True, False), 'b-positive only'),
+             ((False, False, False), 'not met'), ((None, None, False), 'no valid window'), ((False, False, True), 'aftershock of an earlier marked event')]
+    xs = [-1.38, -0.86, -0.46, -0.08, 0.20, 0.60]          # the legend runs under the row labels too (axes x < 0 is free)
+    for (yc, yp, dsh), lab, x in zip([i[0] for i in items], [i[1] for i in items], xs):
+        glyph(x, nrow2 + 0.42, 5.5, yc, yp, dsh)
+        ax.text(x + 0.035, nrow2 + 0.42, lab, ha='left', va='center', fontsize=5.4, color=INK2)
+    ax.text(-1.40, nrow2 + 0.78, 'Circle size = magnitude (M≥6 labelled); left half b-classical, right half b-positive; filled = ≥ 10% below (drop) / '
+            'above (rise) the pre-sequence reference.', ha='left', va='center', fontsize=5.4, color=MUTED)
     norm = Normalize(0, 100)
     for x, cm, lab in ((0.42, CM_SEQ, 'b-classical'), (0.70, CM_SEQ_RED, 'b-positive')):
         cax = fig.add_axes([x, 0.045, 0.22, 0.012])
@@ -325,9 +474,117 @@ def figS_C4(events, figrun, path, days=365):
     for ax in axes.ravel()[n:]:
         ax.axis('off')
     handles = [Line2D([], [], color=C_GR, lw=1.2, label='b-classical'), Line2D([], [], color=C_BPOS, lw=1.2, label='b-positive'),
-               Line2D([], [], color=INK2, lw=0.8, ls=(0, (3, 2)), label='reference (mean of the earlier windows of the panel)'),
+               Line2D([], [], color=INK2, lw=0.8, ls=(0, (3, 2)), label='reference (median of the earlier pre-sequence windows of the panel)'),
                Line2D([], [], color=INK2, lw=2.2, label='pre-event / post-event window')]
     fig.legend(handles=handles, loc='lower center', ncol=4, fontsize=6.5, bbox_to_anchor=(0.5, 0.0))
     fig.text(0.5, 0.025, 'days relative to the event', ha='center', fontsize=7, color=INK2)
     fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(path); plt.close(fig)
+
+
+# ------------------------------------------------------------------ main-text table (spatial rows + C4 Form B) rendered as a figure
+
+TABLE_ROWS = [  # (key, title, sub-line)
+    ('C12_rate', 'C1–C2  Low b with high strain rate,\n           high b with low strain rate', 'share of all nodes; chance 50%'),
+    ('C1_regime', 'C1  Contractional nodes that are low-b', 'reference: share of low-b nodes'),
+    ('C2_regime', 'C2  Extensional nodes that are high-b', 'reference: share of high-b nodes'),
+    ('C3_hf', 'C3  High-heat-flow nodes that are high-b', 'reference: share of high-b nodes'),
+]
+REGION_NAMES = {'LMS': 'Longmenshan', 'XSH': 'Xianshuihe', 'WYN': 'Western\nYunnan', 'XJ': 'Xiaojiang',
+                'NCP': 'North China\nPlain', 'NW': 'Northwest\nChina'}
+WINDOW_NAMES = {'LMS_2006-2010': 'Longmenshan 2006–2010', 'LMS_2011-2016': 'Longmenshan 2011–2016',
+                'XSH_2022-2023': 'Xianshuihe 2022–2023', 'WYN_2020-2023': 'Western Yunnan 2020–2023',
+                'XJ_2016-2023': 'Xiaojiang 2016–2023', 'NCP_2008-2023': 'North China Plain 2008–2023',
+                'NW_2006-2023': 'Northwest China 2006–2023'}
+
+
+def fig_table(tab, events, path):
+    """One figure with the two main-text tables: (a) spatial claims per region, (b) C4 per marked event (Form B)."""
+    long, _ = c4_event_table(events)
+    n_ev = int(long.groupby('window').size().max())
+    W = 7.2
+    ha, hb = 0.60 * len(TABLE_ROWS) + 0.62, 0.40 * long.window.nunique() + 1.05
+    fig = plt.figure(figsize=(W, ha + hb + 0.55))
+    gs = fig.add_gridspec(2, 1, height_ratios=[ha, hb], hspace=0.08, left=0.01, right=0.99, top=0.985, bottom=0.015)
+    # ---------------------------------------------------------------- (a) spatial claims
+    ax = fig.add_subplot(gs[0]); ax.set_xlim(0, W); ax.set_ylim(ha, 0); ax.axis('off')
+    x_lab, cw = 2.55, (W - 2.55) / len(REGIONS)
+    ax.text(0.02, 0.16, 'a  Spatial claims, 2008–2023 b-value maps (cell: % of nodes supporting the claim, b-classical | b-positive)',
+            fontsize=7.2, fontweight='bold', color=INK, va='center')
+    y0 = 0.62
+    for j, region in enumerate(REGIONS):
+        cx = x_lab + (j + 0.5) * cw
+        ax.text(cx, y0 - 0.25, REGION_NAMES[region], ha='center', va='center', fontsize=6.6, fontweight='semibold', color=INK, linespacing=0.95)
+    ax.plot([0.02, W - 0.02], [y0, y0], color=INK2, lw=0.8)
+    ax.plot([0.02, W - 0.02], [0.34, 0.34], color=INK2, lw=0.8)
+    rh = 0.60
+    for i, (key, title, sub) in enumerate(TABLE_ROWS):
+        y = y0 + i * rh
+        if i % 2 == 1:
+            ax.add_patch(Rectangle((0.02, y), W - 0.04, rh, color='#f3f2ee', lw=0, zorder=0))
+        ax.text(0.08, y + 0.22, title, fontsize=6.6, color=INK, va='center', linespacing=1.0)
+        ax.text(0.08, y + 0.45, sub, fontsize=5.4, color=MUTED, va='center')
+        for j, region in enumerate(REGIONS):
+            cx = x_lab + (j + 0.5) * cw
+            rr = {est: tab[(tab.row == key) & (tab.region == region) & (tab.estimator == est)].iloc[0] for est in ('classical', 'positive')}
+            if not np.isfinite(rr['classical'].pct):
+                ax.text(cx, y + 0.30, 'n/a', ha='center', va='center', fontsize=6.2, color=MUTED); continue
+            pc, pp = rr['classical'], rr['positive']
+            ax.text(cx - 0.05, y + 0.19, f'{pc.pct:.0f}%', ha='right', va='center', fontsize=7.2, color=EST_COL['classical'], fontweight='semibold')
+            ax.text(cx, y + 0.19, '|', ha='center', va='center', fontsize=6, color=MUTED)
+            ax.text(cx + 0.05, y + 0.19, f'{pp.pct:.0f}%', ha='left', va='center', fontsize=7.2, color=EST_COL['positive'], fontweight='semibold')
+            ref = 'ref. 50%' if key == 'C12_rate' else f'ref. {pc.base:.0f}% | {pp.base:.0f}%'
+            ax.text(cx, y + 0.35, ref, ha='center', va='center', fontsize=4.9, color=MUTED)
+            ax.text(cx, y + 0.47, f'n {int(pc.n):,}' + ('' if pc.n == pp.n else f' | {int(pp.n):,}'), ha='center', va='center', fontsize=4.9, color=MUTED)
+    ax.plot([0.02, W - 0.02], [y0 + len(TABLE_ROWS) * rh, y0 + len(TABLE_ROWS) * rh], color=INK2, lw=0.8)
+    # ---------------------------------------------------------------- (b) C4 per marked event
+    ax = fig.add_subplot(gs[1]); ax.set_xlim(0, W); ax.set_ylim(hb, 0); ax.axis('off')
+    x_lab, x_res = 1.95, W - 0.95
+    ew = (x_res - x_lab) / n_ev
+    ax.text(0.02, 0.16, 'b  Temporal claim C4: b drop before each marked event of Figs 4–10 (left half b-classical, right half b-positive)',
+            fontsize=7.2, fontweight='bold', color=INK, va='center')
+    y0 = 0.62
+    ax.plot([0.02, W - 0.02], [y0, y0], color=INK2, lw=0.8)
+    ax.text(x_lab + 0.02, y0 - 0.16, 'events in time order  →', fontsize=5.6, color=MUTED, va='center')
+    ax.text(x_res + 0.22, y0 - 0.22, 'drop before', ha='center', va='center', fontsize=6.0, color=INK, fontweight='semibold')
+    ax.text(x_res + 0.22, y0 - 0.08, 'classical | positive', ha='center', va='center', fontsize=5.0, color=MUTED)
+    rh = 0.40
+    bb = ax.get_position(); ypp = hb / (bb.height * fig.get_figheight() * 72); xpp = W / (bb.width * fig.get_figwidth() * 72)
+    rpt = 4.2   # glyph radius in points
+    for i, lab in enumerate(MAIN_LABELS):
+        g = long[long.window == lab]
+        y = y0 + i * rh
+        if i % 2 == 1:
+            ax.add_patch(Rectangle((0.02, y), W - 0.04, rh, color='#f3f2ee', lw=0, zorder=0))
+        ax.text(0.08, y + 0.14, f'{FIG_OF[lab]}  {WINDOW_NAMES[lab]}', fontsize=6.4, color=INK, va='center')
+        nm6 = int((g.mag >= 6).sum())
+        ax.text(0.08, y + 0.29, f'{len(g)} marked events · {nm6} with M ≥ 6', fontsize=5.0, color=MUTED, va='center')
+        for k, r in enumerate(g.itertuples()):
+            cx, cy = x_lab + (k + 0.5) * ew, y + 0.25
+            for half, val, col in ((0, r.drop_c, EST_COL['classical']), (1, r.drop_p, EST_COL['positive'])):
+                isna = isinstance(val, float) and np.isnan(val)
+                fill = '#e1e0d9' if isna else (col if bool(val) else 'white')
+                ang = np.linspace(np.pi / 2, 3 * np.pi / 2, 24) if half == 0 else np.linspace(-np.pi / 2, np.pi / 2, 24)
+                pts = np.column_stack([cx + rpt * xpp * np.cos(ang), cy + rpt * ypp * np.sin(ang)])
+                ax.add_patch(Polygon(pts, closed=True, facecolor=fill, edgecolor='none', lw=0, clip_on=False, zorder=2))
+            ax.add_patch(Ellipse((cx, cy), 2 * rpt * xpp, 2 * rpt * ypp, facecolor='none', edgecolor=INK2, lw=0.6,
+                                 ls='-' if r.initiator else (0, (1.5, 1.2)), clip_on=False, zorder=3))
+            ax.text(cx, cy - 0.145, f'{r.mag:.1f}', ha='center', va='center', fontsize=5.0,
+                    color=INK if r.mag >= 6 else MUTED, fontweight='semibold' if r.mag >= 6 else 'normal')
+        kc = f'{int(g.drop_c.dropna().astype(bool).sum())}/{int(g.drop_c.notna().sum())}'
+        kp = f'{int(g.drop_p.dropna().astype(bool).sum())}/{int(g.drop_p.notna().sum())}'
+        ax.text(x_res + 0.17, y + 0.22, kc, ha='right', va='center', fontsize=7.0, color=EST_COL['classical'], fontweight='semibold')
+        ax.text(x_res + 0.22, y + 0.22, '|', ha='center', va='center', fontsize=6, color=MUTED)
+        ax.text(x_res + 0.27, y + 0.22, kp, ha='left', va='center', fontsize=7.0, color=EST_COL['positive'], fontweight='semibold')
+    yb = y0 + len(MAIN_LABELS) * rh
+    ax.plot([0.02, W - 0.02], [yb, yb], color=INK2, lw=0.8)
+    rise = []
+    for lab in MAIN_LABELS:
+        g = long[long.window == lab]
+        rise.append(f"{FIG_OF[lab]} {int(g.rise_c.dropna().astype(bool).sum())}/{int(g.rise_c.notna().sum())} | {int(g.rise_p.dropna().astype(bool).sum())}/{int(g.rise_p.notna().sum())}")
+    ax.text(0.08, yb + 0.13, 'Filled = b of the last window before the event ≥ 10% below the pre-sequence reference (median of the earlier '
+            'windows of the panel); dashed outline = aftershock of an earlier marked event; grey = no valid window.', fontsize=4.6, color=MUTED, va='center')
+    ax.text(0.08, yb + 0.26, 'Rise after (first post-event window ≥ 10% above the same reference), classical | positive: ' + '; '.join(rise) + '.',
+            fontsize=4.8, color=MUTED, va='center')
+    fig.savefig(path, bbox_inches='tight', pad_inches=0.04)
+    plt.close(fig)

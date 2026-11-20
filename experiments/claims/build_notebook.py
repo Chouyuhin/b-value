@@ -21,7 +21,7 @@ settings (N, Mc, dmc = 0.1, grid radius 0.5°, N per node). No hypothesis tests.
 (paper helpers copied verbatim from `bvalue4longmenshan.ipynb`), table and figures in `claims_report.py`.
 
 Claims: **C1** low b ↔ high stress, **C2** high b ↔ low stress, **C3** high b ↔ fluids, **C4** b drops before (C4a) and rises
-after (C4b) mainshocks, plus the alarm/false-alarm view of C4.
+after (C4b) the marked events.
 """)
 code("""
 import os, time, warnings
@@ -89,7 +89,7 @@ for region in REGIONS:
     t = time.time(); df = load_region(region, MAP_T0, MAP_T1)
     mc = float(estimate_mc_maxc(df['mag'].to_numpy(), fmd_bin=0.1)[0])
     bc = b_window(df['mag'], df['time'], mc, ClassicBValueEstimator); bp = b_window(df['mag'], df['time'], mc, BPositiveBValueEstimator)
-    thr[region] = dict(mc=mc, n=len(df), b_c=bc.b_value, b_p=bp.b_value)
+    thr[region] = dict(mc=mc, n=len(df), b_c=bc.b_value, b_p=bp.b_value, n_c=bc.n, n_p=bp.n)   # n_c / n_p = sample sizes of the two regional fits (Utsu test)
     nc = bmap_nodes(df, mc, N_PER_GRID[region], ClassicBValueEstimator, BOXES[region])
     npos = bmap_nodes(df, mc, N_PER_GRID[region], BPositiveBValueEstimator, BOXES[region])
     nodes = nc.rename(columns={'b': 'b_c', 'std': 'std_c', 'n': 'n_c'}).drop(columns=['radius'])
@@ -109,25 +109,55 @@ thr = pd.DataFrame(thr).T; thr.to_csv(OUT / 'thresholds_2008-2023.csv'); thr
 md("""
 ## 3. C4 on the main-text windows (Figs 4–10): marked events, alarm episodes (events_C4.csv, alarms_C4.csv)
 
-Unit = each main-text window with its own N and Mc; reference of a window = mean of all earlier windows of the panel that
-share no event with it (pre-event expanding mean, \u2265 5 windows). Targets = the events
-marked in panel (d) (fifth-largest rule).
-Drop = last window before the event ≥10% below its reference; rise = first N events after a 7-day blind
-time ≥10% above the pre-event b. Alarm = window ≥10% below the reference; contiguous windows = one episode; a drop is a hit
-when an M≥4 occurs in the window region within the following 7 days; false-alarm rate = 100% − hit rate (all episodes counted;
-the in-sequence flag is kept in alarms_C4.csv).
+Unit = each main-text window with its own N and Mc (the paper's settings); targets = the events marked in panel (d)
+(fifth-largest rule). Rules follow the published definitions (revised 2026-10-29):
+
+- classical series: every window re-cut at max(panel Mc, MAXC + 0.2 of the window), ≥ 50 events above it
+  (Gulia & Wiemer 2019, Methods steps 5–6a; Gulia et al. 2018); b-positive: panel Mc, dmc = 0.1, no re-cut and no
+  exclusion (van der Elst 2021; Lippiello & Petrillo 2024).
+- reference of a window = median of the earlier windows of the panel that share no event with it, leaving out windows
+  that end inside the Gardner–Knopoff time window of an earlier marked event (Gulia & Wiemer 2019, 6a; Gulia et al. 2018);
+  fewer than 5 eligible windows → the region's 2008–2023 whole-period b (Gulia & Wiemer 2019, 6b).
+- drop = last window before the event ≥ 10% below its reference; rise = first post-event window ≥ 10% above the same
+  reference (Gulia & Wiemer 2019, step 7). The classical post window starts when the per-window Mc is back at the panel
+  floor (Gulia et al. 2018: events removed until Mc(t) matches the pre-cut level); the b-positive post window is the
+  first window whose events all follow the event (van der Elst 2021).
+- alarm episodes (runs of windows ≥ 10% below the reference) and their 7-day M≥4 follow-up are still written to
+  alarms_C4.csv, but the false-alarm column was removed from the table on 2026-10-29: a false-alarm count needs an a priori
+  target and validity window (Gulia et al. 2024 use a larger event within 3 months and the G-K radius, a question unrelated
+  to this section), which regional windows cannot supply without arbitrary choices.
 """)
 code("""
+# the fast MAXC used for the per-window re-cut must equal seismostats' estimate_mc_maxc
+rng = np.random.default_rng(0)
+for label in MAIN_LABELS:
+    t0, t1 = window_span(label); df_ = load_region(figrun.loc[label, 'region'], t0, t1); n_ = int(figrun.loc[label, 'n_m'])
+    for i0 in rng.integers(0, max(1, len(df_) - n_), 20):
+        w_ = df_['mag'].to_numpy()[i0:i0 + n_]
+        assert np.isclose(maxc(w_), estimate_mc_maxc(w_, fmd_bin=0.1)[0]), (label, i0)
+print('maxc == estimate_mc_maxc on 140 random windows')
 EV, EP, SM = [], [], []
 for label in MAIN_LABELS:
     for cls in (ClassicBValueEstimator, BPositiveBValueEstimator):
         ev, ep, sm = window_c4(label, cls, figrun); EV.append(ev); EP.append(ep); SM.append(sm)
 events = pd.concat(EV, ignore_index=True); alarms = pd.concat(EP, ignore_index=True); c4_summary = pd.DataFrame(SM)
 events.to_csv(OUT / 'events_C4.csv', index=False); alarms.to_csv(OUT / 'alarms_C4.csv', index=False); c4_summary.to_csv(OUT / 'alarms_C4_summary.csv', index=False)
-c4_summary[['fig', 'window', 'estimator', 'n_m', 'b_ww', 'n_marked', 'drop_k', 'drop_n', 'rise_k', 'rise_n', 'n_episodes', 'n_hits', 'hit_ref_share']].round(3)
+c4_summary[['fig', 'window', 'estimator', 'n_m', 'mc', 'b_ww', 'b_regional', 'n_windows', 'n_windows_valid', 'n_windows_in_seq', 'n_marked', 'n_ref_regional',
+            'drop_k', 'drop_n', 'rise_k', 'rise_n', 'n_episodes', 'n_hits', 'hit_ref_share']].round(3)
 """)
 code("""
-events[['fig', 'estimator', 'number', 'time', 'mag', 'initiator', 'ref', 'b_pre', 'pre_days', 'drop_rel', 'drop', 'b_post', 'post_start_days', 'post_days', 'rise_rel', 'rise']].round(3)
+events[['fig', 'estimator', 'number', 'time', 'mag', 'initiator', 'ref', 'ref_source', 'n_ref', 'b_pre', 'mc_pre', 'pre_days', 'drop_rel', 'drop',
+        'b_post', 'mc_post', 'post_start_days', 'post_days', 'rise_rel', 'rise']].round(3)
+""")
+md("""
+SI sensitivity: b-positive with dmc = 0.2 (van der Elst 2021's default; the paper's panel (c) checks 0.1/0.2/0.4).
+""")
+code("""
+SM2 = [window_c4(label, BPositiveBValueEstimator, figrun, dmc=0.2)[2] for label in MAIN_LABELS]
+c4_dmc02 = pd.DataFrame(SM2); c4_dmc02.to_csv(OUT / 'alarms_C4_summary_dmc02.csv', index=False)
+cmp = c4_summary[c4_summary.estimator == 'positive'].set_index('fig')[['drop_k', 'drop_n', 'rise_k', 'rise_n', 'n_episodes', 'n_hits']].join(
+    c4_dmc02.set_index('fig')[['drop_k', 'drop_n', 'rise_k', 'rise_n', 'n_episodes', 'n_hits']], rsuffix='_dmc02')
+cmp
 """)
 
 md("""
@@ -162,9 +192,12 @@ code("""
 tab = build_table(thr, gcmt); tab.to_csv(OUT / 'claims_table.csv', index=False)
 c4 = build_c4_table(SM); c4.to_csv(OUT / 'claims_table_C4.csv', index=False)
 mdtxt = table_markdown(tab, c4); open(OUT / 'claims_table.md', 'w').write(mdtxt); display(Markdown(mdtxt))
+c4_long, c4_md = c4_event_table(events)   # Form B (chosen 2026-10-29): one row per window, one cell per marked event
+c4_long.to_csv(OUT / 'table_C4_events.csv', index=False); open(OUT / 'table_C4_events.md', 'w').write(c4_md); display(Markdown(c4_md))
 """)
 code("""
-fig_summary(tab, c4, OUT / 'fig_summary.pdf')
+fig_summary(tab, c4, OUT / 'fig_summary.pdf', events=events)
+fig_table(tab, events, OUT / 'table_main.pdf')   # main-text table (spatial rows + C4 Form B) rendered as one figure, 2026-10-30
 figS_C12(thr, gcmt, OUT / 'figS_C12.pdf')
 figS_C3(thr, hf, OUT / 'figS_C3.pdf')
 figS_C4(events, figrun, OUT / 'figS_C4.pdf')
